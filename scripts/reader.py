@@ -52,7 +52,7 @@ def merianselect ( merian, zmin=0.07, zmax=0.09, maglim=22., only_use=True, verb
 
 def galexcrossmatch ( filename=None,  ):
     if filename is None:
-        filename = '/Users/kadofong/Downloads/MAST_Crossmatch_GALEX.csv'
+        filename = '../local_data/inputs/MAST_Crossmatch_GALEX.csv'
         
     crossmatch = table.Table.read(
         filename, 
