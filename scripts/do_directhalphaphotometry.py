@@ -23,7 +23,7 @@ from ekfphot import photometry as ep
 
 
 from meriancontinuum import fitting_utils
-from burstiness import photometry, utils
+from agrias import photometry, utils
 import reader
 
 
