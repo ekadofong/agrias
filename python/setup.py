@@ -1,7 +1,7 @@
 import setuptools
 
 setuptools.setup (
-    name = 'burstiness',
+    name = 'agrias',
     version='0.0.1',
     author='Erin Kado-Fong',
     description='Analysis tools for the Merian sample',
