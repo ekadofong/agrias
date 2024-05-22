@@ -1,5 +1,9 @@
 import os
-os.environ['MERCONT_HOME'] = '/Users/kadofong/work/projects/merian/meriancontinuum/'
+if os.path.exists('/tigress/kadofong'):
+    dirstem = '/tigress/kadofong/merian/'
+    os.environ['MERCONT_HOME'] = '/tigress/kadofong/merian/packages/meriancontinuum/'
+else:
+    os.environ['MERCONT_HOME'] = '/Users/kadofong/work/projects/merian/meriancontinuum/'
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -26,7 +30,8 @@ import reader
 
 
 def read_catalogs():
-    merian = table.Table(fits.getdata('/Users/kadofong/Downloads/Merian_DR1_photoz_EAZY_v1.2.fits',1))
+    catfile = '../local_data/inputs/Merian_DR1_photoz_EAZY_v1.2.fits'
+    merian = table.Table(fits.getdata(catfile,1))
     ms = reader.merianselect ( merian )
     _galex = reader.galexcrossmatch ()
     overlap = ms.index.intersection(_galex.index)
@@ -119,7 +124,10 @@ def singleton (
 def main ():
     merian_sources, galex = read_catalogs ()
     emission_correction, ge_correction, extinction_correction = observational_corrections ( merian_sources )
-    dirname = '/Users/kadofong/work/projects/merian/burstiness/local_data/cutouts/galex_MDR1'
+    if os.path.exists('/tigress/kadofong'):
+        dirname = '/tigress/kadofong/merian/pixel_excess/local_data/cutouts/galex_MDR1'        
+    else:
+        dirname = '/Users/kadofong/work/projects/merian/agrias/local_data/cutouts/galex_MDR1'
     
     lha_df = pd.DataFrame ( index=merian_sources.index, columns=['LHa', 'u_LHa'])
     for name in merian_sources.index:
