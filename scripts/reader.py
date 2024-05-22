@@ -7,7 +7,7 @@ from astropy import cosmology
 
 from ekfphys import observer
 
-from burstiness import utils as bu
+from agrias import utils as bu
 
 cosmo = cosmology.FlatLambdaCDM(70.,0.3)
 
