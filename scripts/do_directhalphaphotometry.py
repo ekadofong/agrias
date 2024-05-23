@@ -118,8 +118,10 @@ def singleton (
     emask, catparams = bbmb.define_autoaper('i')
     ihalum = halum[emask].sum()    
     u_ihalum = np.sqrt((u_halum[emask]**2).sum())
+    imag = -2.5*np.log10( matched_image['i'][emask].sum() * 1e-9 / 3631. ) # \\ convert to AB mag for flux in nJy
+    n708mag = -2.5*np.log10( matched_image['N708'][emask].sum() * 1e-9 / 3631. )
     
-    return ihalum, u_ihalum 
+    return ihalum, u_ihalum, (imag, n708mag)
     
 def main ():
     merian_sources, galex = read_catalogs ()
@@ -132,7 +134,7 @@ def main ():
     lha_df = pd.DataFrame ( index=merian_sources.index, columns=['LHa', 'u_LHa'])
     for name in merian_sources.index:
         try:    
-            ihalum, u_ihalum = singleton (
+            ihalum, u_ihalum, (imag, n708mag) = singleton (
                 merian_sources,
                 name, 
                 dirname,
@@ -143,6 +145,8 @@ def main ():
         
             lha_df.loc[name, 'LHa'] = ihalum.value / 1e40 # save in units of 10^40 erg / s
             lha_df.loc[name, 'u_LHa'] = u_ihalum.value / 1e40 # save in units of 10^40 erg/s
+            lha_df.loc[name, 'imag'] = imag
+            lha_df.loc[name, 'n708mag'] = n708mag
         except IOError:
             print(f'{name} not found in {dirname}!')
             
