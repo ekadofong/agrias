@@ -1,1 +1,1 @@
-/Users/kadofong/work/projects/merian/pixel_excess/notebooks/reader.py
+../scripts/reader.py
