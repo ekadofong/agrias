@@ -152,9 +152,7 @@ def main ():
             nprocessed += 1 
         except IOError:
             print(f'{name} not found in {dirname}!')
-        
-        if nprocessed > 10:
-            break
+
             
     return lha_df
 
