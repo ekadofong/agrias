@@ -4,6 +4,7 @@ from astropy import table
 from astropy import units as u
 from astropy import constants as co
 from astropy import cosmology
+from astropy.io import fits
 
 from ekfphys import observer
 
@@ -11,7 +12,7 @@ from agrias import utils as bu
 
 cosmo = cosmology.FlatLambdaCDM(70.,0.3)
 
-def merianselect ( merian, zmin=0.07, zmax=0.09, maglim=22., only_use=True, verbose=1 ):
+def merianselect ( merian, zmin=0.07, zmax=0.09, maglim=22., only_use=True, verbose=1, av=None ):
     mertab = merian.copy()#[[bu.merian_id, bu.merian_ra, bu.merian_dec, 'z_phot', 'i_cModelmag_Merian']]
     mertab.rename_column(bu.merian_ra,'RA')
     mertab.rename_column(bu.merian_dec,'DEC')
@@ -39,7 +40,9 @@ def merianselect ( merian, zmin=0.07, zmax=0.09, maglim=22., only_use=True, verb
     )
     mertab['Mi'] = mertab['i_cModelmag_Merian'] - cosmo.distmod(mertab['z_phot'].values).value - kcorr_i
     gr = -2.5*np.log10(mertab[bu.photcols['g']]/mertab[bu.photcols['r']])
-    mertab['AV'] = 10.**(0.67*gr - 0.25)
+    if av is None:
+        av = 0.42 # SAGAbg-A mean
+    mertab['AV'] = av
     
     if only_use:
         if verbose > 0:
@@ -66,6 +69,19 @@ def galexcrossmatch ( filename=None,  ):
 
     galex = crossmatch.loc[crossmatch.sort_values('nuv_exptime', ascending=False).index.duplicated(keep='first')]        
     return galex
+
+def get_meriancrossgalex ():
+    merian = table.Table(fits.getdata('../local_data/inputs/Merian_DR1_photoz_EAZY_v1.2.fits',1))
+    ms = merianselect ( merian )
+    _galex = galexcrossmatch ()
+    overlap = ms.index.intersection(_galex.index)
+
+    merian_sources = ms.reindex(overlap)
+
+    _galex = _galex.sort_values('fuv_exptime', ascending=False)
+
+    galex = _galex.loc[~_galex.index.duplicated(keep='first')].reindex(overlap).reset_index()
+    return merian_sources, galex     
 
 def galex_luminosities ( galex, redshifts, ge_arr, dust_corr ):
     uv_color = galex['fuv_mag'] - galex['nuv_mag']
