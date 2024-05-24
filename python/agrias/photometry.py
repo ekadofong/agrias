@@ -47,7 +47,11 @@ def mbestimate_halpha (
         specflux_unit = None,
     ):
     if specflux_unit is None:
-        specflux_unit = u.nJy
+        # -2.5 log10(X/3631 Jy) = 27
+        # log10(X/3631 Jy) = 27/-2.5
+        # X/3631 Jy = 10^(27/-2.5)
+        # X = 10^(27./-2.5) * 3631 Jy
+        specflux_unit = 10.**(27./-2.5) * 3631. * u.Jy
         
     bandspecflux_continuum = (rdata + idata )/2. * specflux_unit
     bandspecflux_line = n708data*specflux_unit - bandspecflux_continuum

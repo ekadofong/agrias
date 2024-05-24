@@ -118,8 +118,8 @@ def singleton (
     emask, catparams = bbmb.define_autoaper('i')
     ihalum = halum[emask].sum()    
     u_ihalum = np.sqrt((u_halum[emask]**2).sum())
-    imag = -2.5*np.log10( bbmb.image['i'][emask].sum() * 1e-9 / 3631. ) # \\ convert to AB mag for flux in nJy
-    n708mag = -2.5*np.log10( matched_image['N708'][emask].sum() * 1e-9 / 3631. )
+    imag = -2.5*np.log10( matched_image['i'][emask].sum()) + 27. # \\ convert to AB mag for flux in HSC units
+    n708mag = -2.5*np.log10( matched_image['N708'][emask].sum()) + 27.
     
     return ihalum, u_ihalum, (imag, n708mag)
     
