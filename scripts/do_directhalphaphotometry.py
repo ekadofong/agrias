@@ -72,18 +72,18 @@ def singleton (
     fnames = [
         #f'{dirname}/hsc/{objname}_HSC-g.fits',
         #f'{dirname}/merian/{objname}_N540_merim.fits',
-        f'{dirname}/hsc/{objname}_HSC-r.fits',
+        f'{dirname}/hsc/hsc_r/{objname}_HSC-r.fits',
         f'{dirname}/merian/{objname}_N708_merim.fits',
-        f'{dirname}/hsc/{objname}_HSC-i.fits',
+        f'{dirname}/hsc/hsc_i/{objname}_HSC-i.fits',
         #f'{dirname}/hsc/{objname}_HSC-z.fits',
         #f'{dirname}/hsc/{objname}_HSC-y.fits',
     ]
     psfnames = [
         #f'{dirname}/hsc/{objname}_HSC-g_psf.fits',
         #f'{dirname}/merian/{objname}_N540_merpsf.fits',
-        f'{dirname}/hsc/{objname}_HSC-r_psf.fits',
+        f'{dirname}/hsc/hsc_r/{objname}_HSC-r_psf.fits',
         f'{dirname}/merian/{objname}_N708_merpsf.fits',
-        f'{dirname}/hsc/{objname}_HSC-i_psf.fits',
+        f'{dirname}/hsc/hsc_/i{objname}_HSC-i_psf.fits',
         #f'{dirname}/hsc/{objname}_HSC-z_psf.fits',
         #f'{dirname}/hsc/{objname}_HSC-y_psf.fits',
     ]
