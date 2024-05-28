@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 
 from astropy import table
 from astropy import units as u
@@ -108,24 +109,27 @@ def load_abbyver (
         merian_sources, 
         galex        
     ):
-    linetable = table.Table.read(
+    linetable = pd.read_csv(
         '/Users/kadofong/work/projects/merian/local_data/cutouts/galex/haew.csv', 
-        units=[u.AA, u.Jy, None]
+        #units=[u.AA, u.Jy, None]
+        index_col='objectId_Merian'
     )
-
+    linetable = linetable.loc[~linetable.index.duplicated()]
+    linetable = linetable.reindex(merian_sources.index)
+    
     rv = 4.05
     wv_eff = np.array([1548.85, 2303.37, 7080.])
     ge_arr = np.zeros([len(galex),wv_eff.size])
-    for idx,(z,av) in enumerate(zip(merian_sources['z_phot'].value, merian_sources['ebv_Merian'].value * rv)):
+    for idx,(z,av) in enumerate(zip(merian_sources['z_phot'].values, merian_sources['ebv_Merian'].values * rv)):
         ge_arr[idx] = observer.gecorrection ( wv_eff*(z+1.), av, rv, return_magcorr=False)
 
-    z_phot = merian_sources['z_phot']
+    z_phot = merian_sources['z_phot'].values
     wl_obs = 6563. * u.AA * ( 1. + z_phot )
-    linetable['haflux'] = (linetable['haew'].quantity * linetable['continuum_specflux'].quantity * co.c / wl_obs**2).to(u.erg/u.s/u.cm**2)
+    linetable['haflux'] = (linetable['haew'].values * u.AA * linetable['continuum_specflux'].values * u.Jy * co.c / wl_obs**2).to(u.erg/u.s/u.cm**2).value
     linetable['haflux'] = linetable['haflux'] * ge_arr[:,2]
-    linetable['halum'] = linetable['haflux'] * 4.*np.pi * cosmo.luminosity_distance(z_phot).to(u.cm)**2
+    linetable['halum'] = linetable['haflux'] * 4.*np.pi * cosmo.luminosity_distance(z_phot).to(u.cm).value**2
 
-    linetable['nuvflux'] = 10.**(galex['nuv_mag']/-2.5) * 3631. * u.Jy
-    linetable['nuvflux'] = (linetable['nuvflux'] * ge_arr[:,1]).to(u.erg/u.s/u.cm**2/u.Hz)
-    linetable['nuvlum'] = (linetable['nuvflux'] * 4.*np.pi * cosmo.luminosity_distance(z_phot).to(u.cm)**2).to(u.erg/u.s/u.Hz)  
+    linetable['nuvflux'] = 10.**(galex['nuv_mag'].values/-2.5) * 3631. * u.Jy
+    linetable['nuvflux'] = (linetable['nuvflux'].values  * ge_arr[:,1]).to(u.erg/u.s/u.cm**2/u.Hz).value
+    linetable['nuvlum'] = (linetable['nuvflux'].values * u.erg/u.s/u.cm**2/u.Hz * 4.*np.pi * cosmo.luminosity_distance(z_phot).to(u.cm)**2).to(u.erg/u.s/u.Hz).value
     return linetable  

@@ -62,7 +62,8 @@ def singleton (
         dirname,
         emission_correction, 
         ge_correction, 
-        extinction_correction
+        extinction_correction,
+        save_cutout=True,        
     ):
     row = merian_sources.loc[name]
     skyobj = coordinates.SkyCoord(row['RA'], row['DEC'], unit='deg')
@@ -121,6 +122,10 @@ def singleton (
     imag = -2.5*np.log10( matched_image['i'][emask].sum()) + 27. # \\ convert to AB mag for flux in HSC units
     n708mag = -2.5*np.log10( matched_image['N708'][emask].sum()) + 27.
     
+    if save_cutout:
+        imghdu = fits.PrimaryHDU(data=halum, header=bbmb.hdu['N708'])
+        imghdu.writeto(f'{datadir}/halpha/{objname}.fits', overwrite=True)
+    
     return ihalum, u_ihalum, (imag, n708mag)
     
 def main ():
@@ -130,6 +135,9 @@ def main ():
         dirname = '/tigress/kadofong/merian/pixel_excess/local_data/cutouts/galex_MDR1'        
     else:
         dirname = '/Users/kadofong/work/projects/merian/agrias/local_data/cutouts/galex_MDR1'
+        
+    if not os.exists(f'{dirname}/halpha'):
+        os.makedirs(f'{dirname}/halpha')
     
     lha_df = pd.DataFrame ( index=merian_sources.index, columns=['LHa', 'u_LHa'])
     
@@ -142,7 +150,8 @@ def main ():
                 dirname,
                 emission_correction, 
                 ge_correction, 
-                extinction_correction        
+                extinction_correction,
+                save_cutout=True,  
             )
         
             lha_df.loc[name, 'LHa'] = ihalum.value / 1e40 # save in units of 10^40 erg / s
