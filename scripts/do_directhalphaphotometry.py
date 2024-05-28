@@ -136,7 +136,7 @@ def main ():
     else:
         dirname = '/Users/kadofong/work/projects/merian/agrias/local_data/cutouts/galex_MDR1'
         
-    if not os.exists(f'{dirname}/halpha'):
+    if not os.path.exists(f'{dirname}/halpha'):
         os.makedirs(f'{dirname}/halpha')
     
     lha_df = pd.DataFrame ( index=merian_sources.index, columns=['LHa', 'u_LHa'])
