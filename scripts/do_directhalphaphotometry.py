@@ -159,7 +159,7 @@ def main ():
             lha_df.loc[name, 'imag'] = imag
             lha_df.loc[name, 'n708mag'] = n708mag
             nprocessed += 1 
-        except IOError:
+        except KeyboardInterrupt:
             print(f'{name} not found in {dirname}!')
 
             
