@@ -7,6 +7,7 @@ else:
 
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy import ndimage
 import pandas as pd
 from astropy import table
 from astropy import coordinates
@@ -72,18 +73,18 @@ def singleton (
     fnames = [
         #f'{dirname}/hsc/{objname}_HSC-g.fits',
         #f'{dirname}/merian/{objname}_N540_merim.fits',
-        f'{dirname}/hsc/hsc_r/{objname}_HSC-r.fits',
-        f'{dirname}/merian/{objname}_N708_merim.fits',
-        f'{dirname}/hsc/hsc_i/{objname}_HSC-i.fits',
+        f'{dirname}/hsc/hsc_r/image/{objname}_HSC-r.fits',
+        f'{dirname}/merian/N708/image/{objname}_N708_merim.fits',
+        f'{dirname}/hsc/hsc_i/image/{objname}_HSC-i.fits',
         #f'{dirname}/hsc/{objname}_HSC-z.fits',
         #f'{dirname}/hsc/{objname}_HSC-y.fits',
     ]
     psfnames = [
         #f'{dirname}/hsc/{objname}_HSC-g_psf.fits',
         #f'{dirname}/merian/{objname}_N540_merpsf.fits',
-        f'{dirname}/hsc/hsc_r/{objname}_HSC-r_psf.fits',
-        f'{dirname}/merian/{objname}_N708_merpsf.fits',
-        f'{dirname}/hsc/hsc_i/{objname}_HSC-i_psf.fits',
+        f'{dirname}/hsc/hsc_r/psf/{objname}_HSC-r_psf.fits',
+        f'{dirname}/merian/N708/psf/{objname}_N708_merpsf.fits',
+        f'{dirname}/hsc/hsc_i/psf/{objname}_HSC-i_psf.fits',
         #f'{dirname}/hsc/{objname}_HSC-z_psf.fits',
         #f'{dirname}/hsc/{objname}_HSC-y_psf.fits',
     ]
@@ -97,17 +98,28 @@ def singleton (
         psf = fits.open(psfnames[idx])
         bbmb.add_band(band, skyobj, cutout_size, imfits['IMAGE'], imfits['VARIANCE'], psf[0].data )
     matched_image, matched_psf = bbmb.match_psfs (refband='N708') 
-    
+    cat, segmap = sep.extract(
+        bbmb.matched_image['i'], 
+        thresh=5., 
+        var=bbmb.matched_var['i'], 
+        segmentation_map=True,
+        deblend_nthresh=64,
+    )
+    esegmap = eis.build_ellipsed_segmentationmap(cat, bbmb.matched_image['i'].shape)
+    structures = ndimage.label(esegmap)[0]
+    cid = eis.get_centerval(structures)
+    mask = (structures == cid )|(structures==0)
+    fn = lambda x: np.where(mask, x, np.NaN)
     isrow = np.in1d(merian_sources.index, row.name)
 
     haflux, u_haflux, halum, u_halum = photometry.mbestimate_halpha(
-        matched_image['N708'],
-        matched_image['r'],
-        matched_image['i'],
+        fn(matched_image['N708']),
+        fn(matched_image['r']),
+        fn(matched_image['i']),
         row['z_phot'],
-        u_n708data=bbmb.var['N708']**.5,
-        u_rdata=bbmb.var['r']**.5,
-        u_idata=bbmb.var['i']**.5,
+        u_n708data=fn(bbmb.var['N708']**.5),
+        u_rdata=fn(bbmb.var['r']**.5),
+        u_idata=fn(bbmb.var['i']**.5),
         do_aperturecorrection=False,
         do_extinctioncorrection=True,
         do_gecorrection=True,
@@ -123,8 +135,10 @@ def singleton (
     n708mag = -2.5*np.log10( matched_image['N708'][emask].sum()) + 27.
     
     if save_cutout:
-        imghdu = fits.PrimaryHDU(data=halum, header=bbmb.hdu['N708'])
-        imghdu.writeto(f'{datadir}/halpha/{objname}.fits', overwrite=True)
+        imghdu = fits.PrimaryHDU(data=halum.value, header=bbmb.hdu['N708']) # erg/s/pixel
+        mask = fits.ImageHDU(data=esegmap, header=bbmb.hdu["N708"])
+        hdulist = fits.HDUList([imghdu, mask])
+        hdulist.writeto(f'{dirname}/halpha/{objname}.fits', overwrite=True)
     
     return ihalum, u_ihalum, (imag, n708mag)
     
@@ -159,7 +173,7 @@ def main ():
             lha_df.loc[name, 'imag'] = imag
             lha_df.loc[name, 'n708mag'] = n708mag
             nprocessed += 1 
-        except KeyboardInterrupt:
+        except IOError:
             print(f'{name} not found in {dirname}!')
 
             
