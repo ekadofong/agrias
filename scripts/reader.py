@@ -71,8 +71,9 @@ def galexcrossmatch ( filename=None,  ):
     galex = crossmatch.loc[crossmatch.sort_values('nuv_exptime', ascending=False).index.duplicated(keep='first')]        
     return galex
 
-def get_meriancrossgalex ():
-    merian = table.Table(fits.getdata('../local_data/inputs/Merian_DR1_photoz_EAZY_v1.2.fits',1))
+def get_meriancrossgalex (merian=None):
+    if merian is None:
+        merian = table.Table(fits.getdata('../local_data/inputs/Merian_DR1_photoz_EAZY_v1.2.fits',1))
     ms = merianselect ( merian )
     _galex = galexcrossmatch ()
     overlap = ms.index.intersection(_galex.index)
