@@ -42,7 +42,9 @@ def merianselect ( merian, zmin=0.07, zmax=0.09, maglim=22., only_use=True, verb
     mertab['Mi'] = mertab['i_cModelmag_Merian'] - cosmo.distmod(mertab['z_phot'].values).value - kcorr_i
     gr = -2.5*np.log10(mertab[bu.photcols['g']]/mertab[bu.photcols['r']])
     if av is None:
-        av = 0.42 # SAGAbg-A mean
+        #av = 0.42 # SAGAbg-A mean
+        saga_gr_av_coeffs = np.array([ 12.79771209, -22.34904904,  11.30434592,   0.33866297, -1.33162037])
+        av = 10.**np.poly1d(saga_gr_av_coeffs)(gr)
     mertab['AV'] = av
     
     if only_use:
@@ -88,8 +90,8 @@ def get_meriancrossgalex (merian=None):
 def galex_luminosities ( galex, redshifts, ge_arr, dust_corr ):
     uv_color = galex['fuv_mag'] - galex['nuv_mag']
     for idx,band in enumerate(['fuv','nuv']):
-        uvflux = 10.**(galex['nuv_mag']/-2.5) * 3631. * u.Jy
-        u_uvflux = 0.4*np.log(10.)*uvflux*galex['nuv_magerr'] 
+        uvflux = 10.**(galex[f'{band}_mag']/-2.5) * 3631. * u.Jy
+        u_uvflux = 0.4*np.log(10.)*uvflux*galex[f'{band}_magerr'] 
         uvflux = uvflux.to(u.erg/u.s/u.cm**2/u.Hz)
         uvflux *= dust_corr[:,idx] # \\ internal extinction corrections
         u_uvflux *= dust_corr[:,idx]
