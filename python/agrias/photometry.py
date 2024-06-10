@@ -92,12 +92,14 @@ def mbestimate_halpha (
     
     return haflux, u_haflux, halum, u_halum
 
-def uvopt_gecorrection (merian_sources, rv=4.05):
+def uvopt_gecorrection (merian_sources, av=None, rv=3.1):
+    if av is None:
+        av = merian_sources['ebv_Merian'] * rv
     wv_eff = np.array([1548.85, 2303.37, 0.])
     ge_arr = np.zeros([len(merian_sources),wv_eff.size])
-    for idx,(z,av) in enumerate(zip(merian_sources['z_phot'], merian_sources['ebv_Merian'] * rv)):
+    for idx,(z,c_av) in enumerate(zip(merian_sources['z_phot'], av)):
         wv_eff[2] = harestwl.value * (1. + z)
-        ge_arr[idx] = observer.gecorrection ( wv_eff/(1. + z), av, rv, return_magcorr=False)
+        ge_arr[idx] = observer.gecorrection ( wv_eff/(1. + z), c_av, rv, return_magcorr=False)
     return ge_arr
 
 def uvopt_internalextcorrection (merian_sources):

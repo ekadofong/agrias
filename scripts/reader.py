@@ -13,13 +13,14 @@ from agrias import utils as bu
 
 cosmo = cosmology.FlatLambdaCDM(70.,0.3)
 
-def merianselect ( merian, zmin=0.07, zmax=0.09, maglim=22., only_use=True, verbose=1, av=None ):
+def merianselect ( merian, zmin=0.07, zmax=0.09, maglim=22., only_use=True, verbose=1, av=None, zp=31.4 ):
     mertab = merian.copy()#[[bu.merian_id, bu.merian_ra, bu.merian_dec, 'z_phot', 'i_cModelmag_Merian']]
     mertab.rename_column(bu.merian_ra,'RA')
     mertab.rename_column(bu.merian_dec,'DEC')
     inband = mertab['z_phot']>zmin
     inband &= mertab['z_phot']<zmax
-    inband &= mertab['i_cModelmag_Merian']<maglim
+    n708mag = -2.5*np.log10(mertab[bu.photcols['N708']]) + zp
+    inband &= n708mag<maglim
     if verbose > 0:
         print(f'[merianselect] Only choosing sources at {zmin:.3f}<z_phot<{zmax:.3f}')
         print(f'[merianselect] Only choosing sources with i_cModelmag_Merian < {maglim:.1f}')
@@ -45,6 +46,7 @@ def merianselect ( merian, zmin=0.07, zmax=0.09, maglim=22., only_use=True, verb
         #av = 0.42 # SAGAbg-A mean
         saga_gr_av_coeffs = np.array([ 12.79771209, -22.34904904,  11.30434592,   0.33866297, -1.33162037])
         av = 10.**np.poly1d(saga_gr_av_coeffs)(gr)
+        av[av>4] = np.NaN
     mertab['AV'] = av
     
     if only_use:

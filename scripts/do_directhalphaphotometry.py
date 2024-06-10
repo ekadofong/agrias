@@ -28,8 +28,6 @@ from agrias import photometry, utils
 import reader
 
 
-
-
 def read_catalogs():
     catfile = '../local_data/inputs/Merian_DR1_photoz_EAZY_v1.2.fits'
     merian = table.Table(fits.getdata(catfile,1))
