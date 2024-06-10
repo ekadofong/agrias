@@ -60,7 +60,6 @@ def main (verbose=2):
             direct_galex.loc[name, 'u_flux_fuv'] = galex_photometry[1,0]
             direct_galex.loc[name, 'flux_nuv'] = galex_photometry[0,1]
             direct_galex.loc[name, 'u_flux_nuv'] = galex_photometry[1,1] 
-            break
         except FileNotFoundError:
             if verbose>1:
                 print(f'{name} image not found!')        
