@@ -56,12 +56,10 @@ def main (verbose=2):
     for name, row in mcat.iterrows ():
         try:
             galex_photometry = singleton ( row, verbose=verbose )
-            print('galex photometry done.')
             galex_photometry.loc[name, 'flux_fuv'] = galex_photometry[0,0]
             galex_photometry.loc[name, 'u_flux_fuv'] = galex_photometry[1,0]
             galex_photometry.loc[name, 'flux_nuv'] = galex_photometry[0,1]
             galex_photometry.loc[name, 'u_flux_nuv'] = galex_photometry[1,1] 
-            print('loaoded.')
             break
         except FileNotFoundError:
             if verbose>1:
