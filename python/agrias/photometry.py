@@ -16,15 +16,19 @@ from . import utils
 
 cosmo = cosmology.FlatLambdaCDM(70.,0.3)
 
-harestwl = 6563. * u.AA
-transmission = table.Table.read(
-    f"{os.environ['MERCONT_HOME']}/data/Filters/mer_n708.txt",
-    comment='#',
-    format='ascii.basic',
-    names=['wv','transmission'],
-    units=[u.AA,None]    
-)[::-1]
-transmission['freq'] = (co.c/transmission['wv']).to(u.Hz)
+def load_transmission (fname=None):
+    if fname is None:
+        fname = f"../local_data/filters/mer_n708.txt"
+    harestwl = 6563. * u.AA
+    transmission = table.Table.read(
+        fname,
+        comment='#',
+        format='ascii.basic',
+        names=['wv','transmission'],
+        units=[u.AA,None]    
+    )[::-1]
+    transmission['freq'] = (co.c/transmission['wv']).to(u.Hz)
+    return transmission
 
 def mbestimate_halpha (
         n708data, 
@@ -43,6 +47,7 @@ def mbestimate_halpha (
         ge_correction=1.,
         ns_correction=1.,
         specflux_unit = None,
+        filter_curve_file = None,
     ):
     if specflux_unit is None:
         # -2.5 log10(X/3631 Jy) = 27
@@ -50,6 +55,8 @@ def mbestimate_halpha (
         # X/3631 Jy = 10^(27/-2.5)
         # X = 10^(27./-2.5) * 3631 Jy
         specflux_unit = 10.**(27./-2.5) * 3631. * u.Jy
+        
+    transmission = load_transmission (filter_curve_file)
         
     bandspecflux_continuum = (rdata + idata )/2. * specflux_unit
     bandspecflux_line = n708data*specflux_unit - bandspecflux_continuum
