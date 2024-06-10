@@ -11,9 +11,7 @@ from astropy.io import fits
 from ekfphys import observer
 from ekfparse import query 
 
-import os
-os.environ['MERCONT_HOME'] = '/Users/kadofong/work/projects/merian/meriancontinuum/'
-from meriancontinuum import fitting_utils
+
 
 from agrias import utils as bu
 from agrias import photometry
@@ -101,6 +99,10 @@ def compute_halphacorrections ( mcat, use_dustengine=True, load_from_pickle=True
     '''
     
     '''
+    import os
+    os.environ['MERCONT_HOME'] = '/Users/kadofong/work/projects/merian/meriancontinuum/'
+    from meriancontinuum import fitting_utils
+    
     if verbose>0:
         start = time.time ()
     # \\ correct for other emission lines via Mintz+24
