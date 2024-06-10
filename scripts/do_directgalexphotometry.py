@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -50,20 +51,30 @@ def singleton ( row, savedir=None, merdir=None, cutout_size=None, verbose=2):
     galex_photometry = gi.do_ephotometry( (row.RA, row.DEC), autoparams )
     return galex_photometry
 
-def main (verbose=2):
+def main (verbose=2, overwrite=False):
     mcat = load_sourcecatalog ()
-    direct_galex = pd.DataFrame ( index=mcat.index, columns = ['flux_fuv', 'u_flux_fuv', 'flux_nuv', 'u_flux_nuv'])
+    savefile = '../local_data/output/galex_photometry.csv'
+    if (not overwrite) and os.path.exists(savefile):
+        direct_galex = pd.read_csv( savefile, index_col=0)
+    else:
+        direct_galex = pd.DataFrame ( index=mcat.index, columns = ['flux_fuv', 'u_flux_fuv', 'flux_nuv', 'u_flux_nuv'])
+    ncomputed=0
     for name, row in mcat.iterrows ():
-        try:
+        if (not overwrite) and (not np.isnan(direct_galex.loc[name, 'flux_nuv'])):
+            continue
+        try:                        
             galex_photometry = singleton ( row, verbose=verbose )
             direct_galex.loc[name, 'flux_fuv'] = galex_photometry[0,0]
             direct_galex.loc[name, 'u_flux_fuv'] = galex_photometry[1,0]
             direct_galex.loc[name, 'flux_nuv'] = galex_photometry[0,1]
             direct_galex.loc[name, 'u_flux_nuv'] = galex_photometry[1,1] 
+            ncomputed += 1
+            if (ncomputed % 100) == 0:
+                direct_galex.to_csv(savefile)
         except FileNotFoundError:
             if verbose>1:
                 print(f'{name} image not found!')        
-    direct_galex.to_csv('../local_data/output/galex_photometry.csv')
+    direct_galex.to_csv(savefile)
                 
         
 if __name__ == '__main__':
