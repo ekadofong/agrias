@@ -1,6 +1,7 @@
+import time
+import pickle
 import numpy as np
 import pandas as pd
-
 from astropy import table
 from astropy import units as u
 from astropy import constants as co
@@ -8,8 +9,15 @@ from astropy import cosmology
 from astropy.io import fits
 
 from ekfphys import observer
+from ekfparse import query 
+
+import os
+os.environ['MERCONT_HOME'] = '/Users/kadofong/work/projects/merian/meriancontinuum/'
+from meriancontinuum import fitting_utils
 
 from agrias import utils as bu
+from agrias import photometry
+
 
 cosmo = cosmology.FlatLambdaCDM(70.,0.3)
 
@@ -78,16 +86,68 @@ def galexcrossmatch ( filename=None,  ):
 def get_meriancrossgalex (merian=None):
     if merian is None:
         merian = table.Table(fits.getdata('../local_data/inputs/Merian_DR1_photoz_EAZY_v1.2.fits',1))
-    ms = merianselect ( merian )
+        merian = merianselect ( merian )
     _galex = galexcrossmatch ()
-    overlap = ms.index.intersection(_galex.index)
+    overlap = merian.index.intersection(_galex.index)
 
-    merian_sources = ms.reindex(overlap)
+    merian_sources = merian.reindex(overlap)
 
     _galex = _galex.sort_values('fuv_exptime', ascending=False)
 
-    galex = _galex.loc[~_galex.index.duplicated(keep='first')].reindex(overlap).reset_index()
+    galex = _galex.loc[~_galex.index.duplicated(keep='first')].reindex(overlap)#.reset_index()
     return merian_sources, galex     
+
+def compute_halphacorrections ( mcat, use_dustengine=True, load_from_pickle=True, verbose=1 ):
+    '''
+    
+    '''
+    if verbose>0:
+        start = time.time ()
+    # \\ correct for other emission lines via Mintz+24
+    emission_correction = fitting_utils.correct_N2_S3(
+        mcat['z_phot'],
+        mcat['logmass_gaap1p0']
+    )**-1    
+    if verbose>0:
+        print(f'Computed line contamination in {time.time() - start:.1f} seconds.')
+        start = time.time ()
+        
+    # \\ Galactic extinction correction
+    if use_dustengine:
+        if load_from_pickle:
+            with open('../local_data/output/dustengine.pickle', 'rb') as f:
+                dusteng = pickle.load(f)
+        else:
+            dusteng = query.DustEngine()
+        direct_geav = mcat.apply(lambda row: dusteng.get_SandFAV(row['RA'], row['DEC']),axis=1) 
+    else:
+        rv = 3.1
+        direct_geav = mcat['ebv_Merian'] * rv
+       
+    ge_correction = photometry.uvopt_gecorrection(mcat, av=direct_geav)
+    if verbose>0:
+        print(f'Computed Galactic extinction in {time.time() - start:.1f} seconds.')
+        start = time.time ()    
+    
+    restwl = np.array([1548.85, 2303.37, 7080.])
+    dust_correction = np.zeros((len(emission_correction),3))
+    for idx,av in enumerate(mcat['AV']):
+        if hasattr(av,'mask'):
+            dust_correction[idx] = np.NaN
+        else:
+            dust_correction[idx] = observer.extinction_correction ( restwl, av, RV=4.05)[0].data
+    if verbose>0:
+        print(f'Computed internal extinction in {time.time() - start:.1f} seconds.')
+        start = time.time ()            
+            
+    aperture_correction = mcat['i_cModelFlux_Merian'] / mcat['i_gaap1p0Flux_Merian']
+    if verbose>0:
+        print(f'Computed aperture correction in {time.time() - start:.1f} seconds.')
+        #start = time.time ()    
+    
+    return emission_correction, ge_correction, dust_correction, aperture_correction
+    
+        
 
 def galex_luminosities ( galex, redshifts, ge_arr, dust_corr ):
     uv_color = galex['fuv_mag'] - galex['nuv_mag']
