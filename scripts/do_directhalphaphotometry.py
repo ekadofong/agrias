@@ -22,11 +22,9 @@ from ekfstats import imstats as eis
 from ekfparse import query
 from ekfphot import photometry as ep
 
-
 from meriancontinuum import fitting_utils
 from agrias import photometry, utils
 import reader
-
 
 def read_catalogs():
     catfile = '../local_data/inputs/Merian_DR1_photoz_EAZY_v1.2.fits'
@@ -36,6 +34,7 @@ def read_catalogs():
     overlap = ms.index.intersection(_galex.index)
 
     merian_sources = ms.reindex(overlap)
+    print(f"<AV>_50 = {np.median(merian_sources['AV']):.3f}")
 
     _galex = _galex.sort_values('fuv_exptime', ascending=False)
 
@@ -93,8 +92,19 @@ def singleton (
     cutout_size = 42.*u.arcsec
     for idx,band in enumerate(bands):
         imfits = fits.open(fnames[idx])
+        hdunames = [ x.name for x in imfits ]
         psf = fits.open(psfnames[idx])
-        bbmb.add_band(band, skyobj, cutout_size, imfits['IMAGE'], imfits['VARIANCE'], psf[0].data )
+        if 'IMAGE' not in hdunames:
+            imgextension = 1
+        else:
+            imgextension = "IMAGE"
+            
+        if 'VARIANCE' not in hdunames:
+            varextension = 3
+        else:
+            varextension = "VARIANCE"            
+            
+        bbmb.add_band(band, skyobj, cutout_size, imfits[imgextension], imfits[varextension], psf[0].data )
     matched_image, matched_psf = bbmb.match_psfs (refband='N708') 
     cat, segmap = sep.extract(
         bbmb.matched_image['i'], 
@@ -134,7 +144,9 @@ def singleton (
     
     if save_cutout:
         imghdu = fits.PrimaryHDU(data=halum.value, header=bbmb.hdu['N708']) # erg/s/pixel
+        imghdu.name = 'HALPHASB'
         mask = fits.ImageHDU(data=esegmap, header=bbmb.hdu["N708"])
+        mask.name = 'SEGMAP'
         hdulist = fits.HDUList([imghdu, mask])
         hdulist.writeto(f'{dirname}/halpha/{objname}.fits', overwrite=True)
     
