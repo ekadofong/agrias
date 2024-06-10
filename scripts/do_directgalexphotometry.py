@@ -64,7 +64,7 @@ def main (verbose=2):
         except FileNotFoundError:
             if verbose>1:
                 print(f'{name} image not found!')        
-    direct_galex.to_csv('../local_data/outputs/galex_photometry.csv')
+    direct_galex.to_csv('../local_data/output/galex_photometry.csv')
                 
         
 if __name__ == '__main__':
