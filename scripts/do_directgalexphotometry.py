@@ -61,7 +61,7 @@ def main (verbose=2, overwrite=False):
     ncomputed=0
     for name, row in mcat.iterrows ():
         if (not overwrite) and (not np.isnan(direct_galex.loc[name, 'flux_nuv'])):
-            if verobse>1:
+            if verbose>1:
                 print(f'{name} already run, skipping...')
             continue
         try:                        
