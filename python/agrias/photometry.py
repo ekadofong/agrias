@@ -12,8 +12,6 @@ from ekfplot import plot as ek
 from ekfplot import colors as ec
 from ekfphys import observer
 
-from meriancontinuum import fitting_utils
-
 from . import utils
 
 cosmo = cosmology.FlatLambdaCDM(70.,0.3)
