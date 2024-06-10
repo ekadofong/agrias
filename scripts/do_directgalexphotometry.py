@@ -56,15 +56,15 @@ def main (verbose=2):
     for name, row in mcat.iterrows ():
         try:
             galex_photometry = singleton ( row, verbose=verbose )
-            galex_photometry.loc[name, 'flux_fuv'] = galex_photometry[0,0]
-            galex_photometry.loc[name, 'u_flux_fuv'] = galex_photometry[1,0]
-            galex_photometry.loc[name, 'flux_nuv'] = galex_photometry[0,1]
-            galex_photometry.loc[name, 'u_flux_nuv'] = galex_photometry[1,1] 
+            direct_galex.loc[name, 'flux_fuv'] = galex_photometry[0,0]
+            direct_galex.loc[name, 'u_flux_fuv'] = galex_photometry[1,0]
+            direct_galex.loc[name, 'flux_nuv'] = galex_photometry[0,1]
+            direct_galex.loc[name, 'u_flux_nuv'] = galex_photometry[1,1] 
             break
         except FileNotFoundError:
             if verbose>1:
                 print(f'{name} image not found!')        
-    galex_photometry.to_csv('../local_data/outputs/galex_photometry.csv')
+    direct_galex.to_csv('../local_data/outputs/galex_photometry.csv')
                 
         
 if __name__ == '__main__':
