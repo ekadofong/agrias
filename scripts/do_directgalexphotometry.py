@@ -60,8 +60,8 @@ def main (verbose=2):
             galex_photometry.loc[name, 'u_flux_fuv'] = galex_photometry[1,0]
             galex_photometry.loc[name, 'flux_nuv'] = galex_photometry[0,1]
             galex_photometry.loc[name, 'u_flux_nuv'] = galex_photometry[1,1] 
-            galex_photometry.to_csv('../local_data/outputs/galex_photometry.csv')         
-        except FileNotFoundError:
+            break
+        except KeyboardInterrupt:
             if verbose>1:
                 print(f'{name} image not found!')        
     galex_photometry.to_csv('../local_data/outputs/galex_photometry.csv')
