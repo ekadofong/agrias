@@ -31,10 +31,9 @@ def read_catalogs():
     merian = table.Table(fits.getdata(catfile,1))
     ms = reader.merianselect ( merian )
     
-    merian_sources = ms#.reindex(overlap)
-    print(f"<AV>_50 = {np.median(merian_sources['AV']):.3f}")
+    print(f"<AV>_50 = {np.median(ms['AV']):.3f}")
     
-    return merian_sources
+    return ms
 
 def observational_corrections (merian_sources):
     emission_correction   = fitting_utils.correct_N2_S3(
