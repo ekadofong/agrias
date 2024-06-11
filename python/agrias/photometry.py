@@ -15,11 +15,11 @@ from ekfphys import observer
 from . import utils
 
 cosmo = cosmology.FlatLambdaCDM(70.,0.3)
+harestwl = 6563. * u.AA
 
 def load_transmission (fname=None):
     if fname is None:
-        fname = f"../local_data/filters/mer_n708.txt"
-    harestwl = 6563. * u.AA
+        fname = f"../local_data/filters/mer_n708.txt"    
     transmission = table.Table.read(
         fname,
         comment='#',

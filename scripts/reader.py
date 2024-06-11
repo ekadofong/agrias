@@ -152,10 +152,14 @@ def compute_halphacorrections ( mcat, use_dustengine=True, load_from_pickle=True
         
 
 def galex_luminosities ( galex, redshifts, ge_arr, dust_corr ):
+    if not isinstance(galex, table.Table):
+        galex = table.Table.from_pandas(galex.reset_index())
+        galex.add_index('index')
+        
     uv_color = galex['fuv_mag'] - galex['nuv_mag']
     for idx,band in enumerate(['fuv','nuv']):
-        uvflux = 10.**(galex[f'{band}_mag']/-2.5) * 3631. * u.Jy
-        u_uvflux = 0.4*np.log(10.)*uvflux*galex[f'{band}_magerr'] 
+        uvflux = galex[f'flux_{band}'] * u.Jy
+        u_uvflux = galex[f'u_flux_{band}'] * u.Jy
         uvflux = uvflux.to(u.erg/u.s/u.cm**2/u.Hz)
         uvflux *= dust_corr[:,idx] # \\ internal extinction corrections
         u_uvflux *= dust_corr[:,idx]
@@ -165,11 +169,11 @@ def galex_luminosities ( galex, redshifts, ge_arr, dust_corr ):
         #uvflux *= observer.calc_kcor(band.upper(), redshifts, 'FUV - NUV', uv_color )
         uvlum = (uvflux * 4.*np.pi * cosmo.luminosity_distance(redshifts).to(u.cm)**2).to(u.erg/u.s/u.Hz)   
         u_uvlum = (u_uvflux * 4.*np.pi * cosmo.luminosity_distance(redshifts).to(u.cm)**2).to(u.erg/u.s/u.Hz) 
-        galex[f'{band}_flux_corrected']  = uvflux.value
-        galex[f'u_{band}_flux_corrected']  = u_uvflux.value
+        galex[f'flux_{band}_corrected']  = uvflux.value
+        galex[f'u_flux_{band}_corrected']  = u_uvflux.value
         
-        galex[f'{band}_luminosity'] = uvlum.value        
-        galex[f'u_{band}_luminosity'] = u_uvlum.value
+        galex[f'L{band.upper()}'] = uvlum.value        
+        galex[f'u_L{band.upper()}'] = u_uvlum.value
     return galex
 
 def load_abbyver (
