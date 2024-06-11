@@ -30,16 +30,11 @@ def read_catalogs():
     catfile = '../local_data/inputs/Merian_DR1_photoz_EAZY_v1.2.fits'
     merian = table.Table(fits.getdata(catfile,1))
     ms = reader.merianselect ( merian )
-    _galex = reader.galexcrossmatch ()
-    overlap = ms.index.intersection(_galex.index)
-
-    merian_sources = ms.reindex(overlap)
+    
+    merian_sources = ms#.reindex(overlap)
     print(f"<AV>_50 = {np.median(merian_sources['AV']):.3f}")
-
-    _galex = _galex.sort_values('fuv_exptime', ascending=False)
-
-    galex = _galex.loc[~_galex.index.duplicated(keep='first')].reindex(overlap).reset_index()
-    return merian_sources, galex
+    
+    return merian_sources
 
 def observational_corrections (merian_sources):
     emission_correction   = fitting_utils.correct_N2_S3(
@@ -153,7 +148,7 @@ def singleton (
     return ihalum, u_ihalum, (imag, n708mag)
     
 def main ():
-    merian_sources, galex = read_catalogs ()
+    merian_sources = read_catalogs ()
     emission_correction, ge_correction, extinction_correction = observational_corrections ( merian_sources )
     if os.path.exists('/tigress/kadofong'):
         dirname = '/tigress/kadofong/merian/pixel_excess/local_data/cutouts/galex_MDR1'        
