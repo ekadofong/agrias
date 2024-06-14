@@ -73,7 +73,7 @@ def main (verbose=2, overwrite=False):
             ncomputed += 1
             if (ncomputed % 100) == 0:
                 direct_galex.to_csv(savefile)
-        except FileNotFoundError:
+        except (FileNotFoundError,OSError):
             if verbose>1:
                 print(f'{name} image not found!')        
     direct_galex.to_csv(savefile)
