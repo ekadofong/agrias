@@ -47,7 +47,7 @@ def singleton ( row, savedir=None, merdir=None, cutout_size=None, verbose=2, mak
     
     exitcode, manifest, names = query.download_galeximages ( row.RA, row.DEC, mid, savedir=savedir )
     gc_output = query.load_galexcutouts(mid, savedir, target, sw=cutout_size, sh=cutout_size, )
-    gi = ep.GalexImaging(gc_output, correct_galacticextinction=True, filter_directory='../local_data/filters/') 
+    gi = ep.GalexImaging(gc_output, correct_galacticextinction=False, filter_directory='../local_data/filters/') 
     
     galex_photometry = gi.do_ephotometry( (row.RA, row.DEC), autoparams )
     if make_checkplot:
