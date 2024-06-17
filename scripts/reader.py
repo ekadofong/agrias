@@ -50,8 +50,11 @@ def merianselect ( merian, zmin=0.07, zmax=0.09, maglim=22., only_use=True, verb
     gr = -2.5*np.log10(mertab[bu.photcols['g']]/mertab[bu.photcols['r']])
     if av is None:
         #av = 0.42 # SAGAbg-A mean
-        saga_gr_av_coeffs = np.array([ 12.79771209, -22.34904904,  11.30434592,   0.33866297, -1.33162037])
-        av = 10.**np.poly1d(saga_gr_av_coeffs)(gr)
+        #saga_gr_av_coeffs = np.array([ 12.79771209, -22.34904904,  11.30434592,   0.33866297, -1.33162037])
+        logmstar = mertab['logmass_gaap1p0']
+         # XXX NEED TO ADD APERTURE CORRECTION!
+        saga_logmstar_coeffs = np.array([ 0.35064268, -3.73081311])
+        av = 10.**np.poly1d(saga_logmstar_coeffs)(logmstar)
         av[av>4] = np.NaN
     mertab['AV'] = av
     
@@ -151,7 +154,7 @@ def compute_halphacorrections ( mcat, use_dustengine=True, load_from_pickle=True
     
         
 
-def galex_luminosities ( galex, redshifts, ge_arr, dust_corr ):
+def galex_luminosities ( galex, redshifts, ge_arr=None, dust_corr=None ):
     if not isinstance(galex, table.Table):
         galex = table.Table.from_pandas(galex.reset_index())
         galex.add_index('index')
@@ -161,10 +164,14 @@ def galex_luminosities ( galex, redshifts, ge_arr, dust_corr ):
         uvflux = galex[f'flux_{band}'] * u.Jy
         u_uvflux = galex[f'u_flux_{band}'] * u.Jy
         uvflux = uvflux.to(u.erg/u.s/u.cm**2/u.Hz)
-        uvflux *= dust_corr[:,idx] # \\ internal extinction corrections
-        u_uvflux *= dust_corr[:,idx]
-        uvflux *= ge_arr[:,idx] # \\ galactic extinction correction
-        u_uvflux *= ge_arr[:,idx]
+        if dust_corr is not None:
+            uvflux *= dust_corr[:,idx] # \\ internal extinction corrections
+            u_uvflux *= dust_corr[:,idx]
+        if ge_arr is not None:
+            uvflux *= ge_arr[:,idx] # \\ galactic extinction correction
+            u_uvflux *= ge_arr[:,idx]
+        else:
+            print('Not doing GE Correction!')
         # \\ ignoring k-correction because it should be 0.01-0.05 mag in this redshift range
         #uvflux *= observer.calc_kcor(band.upper(), redshifts, 'FUV - NUV', uv_color )
         uvlum = (uvflux * 4.*np.pi * cosmo.luminosity_distance(redshifts).to(u.cm)**2).to(u.erg/u.s/u.Hz)   
