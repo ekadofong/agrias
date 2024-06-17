@@ -21,7 +21,7 @@ def load_sourcecatalog ():
     mcat = reader.merianselect(merian, av=0.3)
     return mcat    
     
-def singleton ( row, savedir=None, merdir=None, cutout_size=None, verbose=2):
+def singleton ( row, savedir=None, merdir=None, cutout_size=None, verbose=2, make_checkplot=False):
     if savedir is None:
         savedir = '../local_data/cutouts/galex/'
     if merdir is None:
@@ -43,12 +43,15 @@ def singleton ( row, savedir=None, merdir=None, cutout_size=None, verbose=2):
     bbmb.add_band(band, target, cutout_size, imfits['IMAGE'], imfits['VARIANCE'], psf[0].data )
     bbmb.match_psfs(refband=band)
     emask, autoparams = bbmb.define_autoaper(band)   
+
     
     exitcode, manifest, names = query.download_galeximages ( row.RA, row.DEC, mid, savedir=savedir )
     gc_output = query.load_galexcutouts(mid, savedir, target, sw=cutout_size, sh=cutout_size, )
-    gi = ep.GalexImaging(gc_output, filter_directory='../local_data/filters/') 
+    gi = ep.GalexImaging(gc_output, correct_galacticextinction=True, filter_directory='../local_data/filters/') 
     
     galex_photometry = gi.do_ephotometry( (row.RA, row.DEC), autoparams )
+    if make_checkplot:
+        return bbmb,gi, emask    
     return galex_photometry
 
 def main (verbose=2, overwrite=False):
