@@ -139,6 +139,8 @@ def singleton (
     if save_cutout:
         imghdu = fits.PrimaryHDU(data=halum.value, header=bbmb.hdu['N708']) # erg/s/pixel
         imghdu.name = 'HALPHASB'
+        var = fits.ImageHDU(data=u_halum.value, header=bbmb.hdu['N708'])        
+        var.name = 'U_HALPHASB'
         mask = fits.ImageHDU(data=esegmap, header=bbmb.hdu["N708"])
         mask.name = 'SEGMAP'
         hdulist = fits.HDUList([imghdu, mask])
