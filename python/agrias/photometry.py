@@ -91,9 +91,12 @@ def mbestimate_halpha (
         haflux *= ns_correction
         u_haflux *= ns_correction
     
-    distance_factor = 4.*np.pi*cosmo.luminosity_distance(redshift).to(u.cm)**2
+    dlum = cosmo.luminosity_distance(redshift).to(u.cm)
+    u_dlum = ((cosmo.luminosity_distance(0.09) - cosmo.luminosity_distance(0.07))/2.).to(u.cm) # XXX need to generalize this
+    distance_factor = 4.*np.pi*dlum**2
+    u_distance_factor = 8.*np.pi*dlum*u_dlum
     halum = haflux * distance_factor
-    u_halum = u_haflux * distance_factor
+    u_halum = np.sqrt((u_haflux * distance_factor)**2 + (haflux * u_distance_factor)**2)
     
     return haflux, u_haflux, halum, u_halum
 

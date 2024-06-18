@@ -148,7 +148,7 @@ def singleton (
     
     return ihalum, u_ihalum, (imag, n708mag)
     
-def main ():
+def main (savefile, overwrite=False):
     merian_sources = read_catalogs ()
     emission_correction, ge_correction, extinction_correction = observational_corrections ( merian_sources )
     if os.path.exists('/tigress/kadofong'):
@@ -159,7 +159,10 @@ def main ():
     if not os.path.exists(f'{dirname}/halpha'):
         os.makedirs(f'{dirname}/halpha')
     
-    lha_df = pd.DataFrame ( index=merian_sources.index, columns=['LHa', 'u_LHa'])
+    if os.exists(savefile) and (not overwrite):
+        lha_df =  pd.read_csv( savefile, index_col=0)
+    else:
+        lha_df = pd.DataFrame ( index=merian_sources.index, columns=['LHa', 'u_LHa'])
     
     nprocessed = 0
     for name in merian_sources.index:
@@ -179,6 +182,8 @@ def main ():
             lha_df.loc[name, 'imag'] = imag
             lha_df.loc[name, 'n708mag'] = n708mag
             nprocessed += 1 
+            if (nprocessed % 100) == 0:
+                lha_df.to_csv(savefile)            
         except IOError:
             print(f'{name} not found in {dirname}!')
 
@@ -186,5 +191,6 @@ def main ():
     return lha_df
 
 if __name__ == '__main__':
-    lha_df = main ()
-    lha_df.to_csv('../local_data/output/lha_df.csv')
+    savefile = '../local_data/output/lha_df.csv'
+    lha_df = main (savefile)
+    lha_df.to_csv(savefile)
