@@ -31,7 +31,6 @@ def merianselect ( merian, zmin=0.07, zmax=0.09, maglim=22., only_use=True, verb
         print(f'[merianselect] Only choosing sources at {zmin:.3f}<z_phot<{zmax:.3f}')
         print(f'[merianselect] Only choosing sources with i_cModelmag_Merian < {maglim:.1f}')
     
-    
     mertab = mertab[inband].to_pandas ()
     mertab = mertab.set_index(bu.merian_id)
     mertab.index = [ 'M%i' % idx for idx in mertab.index ] 
@@ -50,11 +49,13 @@ def merianselect ( merian, zmin=0.07, zmax=0.09, maglim=22., only_use=True, verb
     gr = -2.5*np.log10(mertab[bu.photcols['g']]/mertab[bu.photcols['r']])
     if av is None:
         #av = 0.42 # SAGAbg-A mean
-        #saga_gr_av_coeffs = np.array([ 12.79771209, -22.34904904,  11.30434592,   0.33866297, -1.33162037])
-        logmstar = mertab['logmass_gaap1p0']
-         # XXX NEED TO ADD APERTURE CORRECTION!
-        saga_logmstar_coeffs = np.array([ 0.35064268, -3.73081311])
-        av = 10.**np.poly1d(saga_logmstar_coeffs)(logmstar)
+        saga_gr_av_coeffs = np.array([ 12.79771209, -22.34904904,  11.30434592,   0.33866297, -1.33162037])
+        #logmstar = mertab['logmass_gaap1p0']
+        #apercorr = mertab['i_cModelFlux_Merian'] / mertab['i_gaap1p0Flux_Merian']        
+        #logmstar += np.log10(apercorr)
+        #saga_logmstar_coeffs = np.array([ 0.35064268, -3.73081311])
+        #av = 10.**np.poly1d(saga_logmstar_coeffs)(logmstar)
+        av = 10.**np.poly1d(saga_gr_av_coeffs)(gr)
         av[av>4] = np.NaN
     mertab['AV'] = av
     
