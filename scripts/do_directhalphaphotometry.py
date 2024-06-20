@@ -114,7 +114,7 @@ def singleton (
     fn = lambda x: np.where(mask, x, np.NaN)
     isrow = np.in1d(merian_sources.index, row.name)
 
-    haflux, u_haflux, halum, u_halum = photometry.mbestimate_halpha(
+    (haflux, u_haflux), (halum, u_halum), (haew, u_haew) = photometry.mbestimate_halpha(
         fn(matched_image['N708']),
         fn(matched_image['r']),
         fn(matched_image['i']),
@@ -146,7 +146,7 @@ def singleton (
         hdulist = fits.HDUList([imghdu, mask])
         hdulist.writeto(f'{dirname}/halpha/{objname}.fits', overwrite=True)
     
-    return haflux, u_haflux, ihalum, u_ihalum, (imag, n708mag)
+    return haflux, u_haflux, ihalum, u_ihalum, haew, u_haew, (imag, n708mag)
     
 def main (savefile, overwrite=True):
     merian_sources = read_catalogs ()
@@ -162,12 +162,12 @@ def main (savefile, overwrite=True):
     if os.exists(savefile) and (not overwrite):
         lha_df =  pd.read_csv( savefile, index_col=0)
     else:
-        lha_df = pd.DataFrame ( index=merian_sources.index, columns=['LHa', 'u_LHa'])
+        lha_df = pd.DataFrame ( index=merian_sources.index, columns=['LHa', 'u_LHa', 'FHa','u_FHa','EWHa','u_EWHa','imag','n708mag'])
     
     nprocessed = 0
     for name in merian_sources.index:
         try:    
-            haflux, u_haflux, ihalum, u_ihalum, (imag, n708mag) = singleton (
+            haflux, u_haflux, ihalum, u_ihalum, haew, u_haew, (imag, n708mag) = singleton (
                 merian_sources,
                 name, 
                 dirname,
@@ -181,6 +181,8 @@ def main (savefile, overwrite=True):
             lha_df.loc[name, 'u_FHa'] = u_haflux.value / 1e-15 # 10^-15 erg / s / cm^2 
             lha_df.loc[name, 'LHa'] = ihalum.value / 1e40 # save in units of 10^40 erg / s
             lha_df.loc[name, 'u_LHa'] = u_ihalum.value / 1e40 # save in units of 10^40 erg/s
+            lha_df.loc[name, 'EWHa'] = haew.value # save in units of 10^40 erg / s
+            lha_df.loc[name, 'u_EWHa'] = u_haew.value # save in units of 10^40 erg/s            
             lha_df.loc[name, 'imag'] = imag
             lha_df.loc[name, 'n708mag'] = n708mag
             nprocessed += 1 

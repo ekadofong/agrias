@@ -69,12 +69,15 @@ def mbestimate_halpha (
     haflux = (bandspecflux_line * tc_integrated / ( trans_atline / haenergy )).to(u.erg/u.s/u.cm**2)
     u_haflux = (u_bandspecflux_line * tc_integrated / ( trans_atline / haenergy )).to(u.erg/u.s/u.cm**2)
     
+    haflux_forew = haflux.copy ()
+    u_haflux_forew = u_haflux.copy()
+    
     # \\ 1'' aperture -> total flux correction,
     # \\ right now just approximated from i_cmodel / i_gaap1p0
     if do_aperturecorrection:
         #totcorr = merian_sources['i_cModelFlux_Merian'] / merian_sources['i_gaap1p0Flux_Merian']
         haflux *= apercorr
-        u_haflux *= apercorr
+        u_haflux *= apercorr        
         
     # \\ rough internal extinction correction assuming AV=0.5
     if do_extinctioncorrection:        
@@ -85,11 +88,19 @@ def mbestimate_halpha (
     if do_gecorrection:
         haflux *= ge_correction
         u_haflux *= ex_correction
-    
+
     # \\ apply Abby's other line corrections
     if do_linecorrection:
         haflux *= ns_correction
         u_haflux *= ns_correction
+        
+        haflux_forew *= ns_correction
+        u_haflux_forew *= ns_correction
+    
+    wv_eff = 7080*u.AA
+    bandspecflux_continuum_wl = co.c * bandspecflux_continuum / wv_eff**2
+    haew = (haflux_forew / bandspecflux_continuum_wl).to(u.AA)
+    u_haew = (u_haflux_forew / bandspecflux_continuum_wl).to(u.AA)
     
     dlum = cosmo.luminosity_distance(redshift).to(u.cm)
     u_dlum = ((cosmo.luminosity_distance(0.09) - cosmo.luminosity_distance(0.07))/2.).to(u.cm) # XXX need to generalize this
@@ -98,7 +109,7 @@ def mbestimate_halpha (
     halum = haflux * distance_factor
     u_halum = np.sqrt((u_haflux * distance_factor)**2 + (haflux * u_distance_factor)**2)
     
-    return haflux, u_haflux, halum, u_halum
+    return (haflux, u_haflux), (halum, u_halum), (haew, u_haew)
 
 def uvopt_gecorrection (merian_sources, av=None, rv=3.1):
     if av is None:
