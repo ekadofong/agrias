@@ -159,7 +159,7 @@ def main (savefile, overwrite=True):
     if not os.path.exists(f'{dirname}/halpha'):
         os.makedirs(f'{dirname}/halpha')
     
-    if os.exists(savefile) and (not overwrite):
+    if os.path.exists(savefile) and (not overwrite):
         lha_df =  pd.read_csv( savefile, index_col=0)
     else:
         lha_df = pd.DataFrame ( index=merian_sources.index, columns=['LHa', 'u_LHa', 'FHa','u_FHa','EWHa','u_EWHa','imag','n708mag'])
