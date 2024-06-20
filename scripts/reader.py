@@ -10,8 +10,7 @@ from astropy.io import fits
 
 from ekfphys import observer
 from ekfparse import query 
-
-
+from ekfstats import fit
 
 from agrias import utils as bu
 from agrias import photometry
@@ -19,7 +18,9 @@ from agrias import photometry
 
 cosmo = cosmology.FlatLambdaCDM(70.,0.3)
 
-def merianselect ( merian, zmin=0.07, zmax=0.09, maglim=22., only_use=True, verbose=1, av=None, zp=31.4 ):
+def merianselect ( merian=None, zmin=0.07, zmax=0.09, maglim=22., only_use=True, verbose=1, av=None, zp=31.4 ):
+    if merian is None:
+        merian = table.Table(fits.getdata('../local_data/inputs/Merian_DR1_photoz_EAZY_v1.2.fits',1))
     mertab = merian.copy()#[[bu.merian_id, bu.merian_ra, bu.merian_dec, 'z_phot', 'i_cModelmag_Merian']]
     mertab.rename_column(bu.merian_ra,'RA')
     mertab.rename_column(bu.merian_dec,'DEC')
@@ -39,23 +40,45 @@ def merianselect ( merian, zmin=0.07, zmax=0.09, maglim=22., only_use=True, verb
         mertab[f'{band}_gaap1p0FluxErr_aperCorr_Merian'] = mertab[f'{band}_gaap1p0FluxErr_Merian'] * mertab[f'{band}_gaap1p0Flux_aperCorr_Merian']/mertab[f'{band}_gaap1p0Flux_Merian']
         
     # \\ apply internal extinction corrections
+    kcorr_g = observer.calc_kcor(
+        'g',
+        mertab['z_phot'],
+        'g - r',
+        -2.5*np.log10(mertab[bu.photcols['g']]/mertab[bu.photcols['r']])        
+    )     
+    kcorr_r = observer.calc_kcor(
+        'r',
+        mertab['z_phot'],
+        'g - r',
+        -2.5*np.log10(mertab[bu.photcols['g']]/mertab[bu.photcols['r']])        
+    )    
     kcorr_i = observer.calc_kcor(
         'i',
         mertab['z_phot'],
         'g - i',
-        -2.5*np.log10(mertab[bu.photcols['g']]/mertab[bu.photcols['r']])        
+        -2.5*np.log10(mertab[bu.photcols['g']]/mertab[bu.photcols['i']])        
     )
     mertab['Mi'] = mertab['i_cModelmag_Merian'] - cosmo.distmod(mertab['z_phot'].values).value - kcorr_i
+    ri = -2.5*np.log10(mertab['r_gaap1p0Flux_aperCorr_Merian']/mertab['i_gaap1p0Flux_aperCorr_Merian'])
+    gi = -2.5*np.log10(mertab['g_gaap1p0Flux_aperCorr_Merian']/mertab['i_gaap1p0Flux_aperCorr_Merian'])
+    mertab['Mr'] = mertab['Mi'] + (ri - kcorr_r + kcorr_i)
+    mertab['Mg'] = mertab['Mi'] + (gi - kcorr_g + kcorr_i)
+    
     gr = -2.5*np.log10(mertab[bu.photcols['g']]/mertab[bu.photcols['r']])
     if av is None:
         #av = 0.42 # SAGAbg-A mean
-        saga_gr_av_coeffs = np.array([ 12.79771209, -22.34904904,  11.30434592,   0.33866297, -1.33162037])
+        #saga_gr_av_coeffs = np.array([ 12.79771209, -22.34904904,  11.30434592,   0.33866297, -1.33162037])
         #logmstar = mertab['logmass_gaap1p0']
         #apercorr = mertab['i_cModelFlux_Merian'] / mertab['i_gaap1p0Flux_Merian']        
         #logmstar += np.log10(apercorr)
         #saga_logmstar_coeffs = np.array([ 0.35064268, -3.73081311])
         #av = 10.**np.poly1d(saga_logmstar_coeffs)(logmstar)
-        av = 10.**np.poly1d(saga_gr_av_coeffs)(gr)
+        
+        saga_coeffs = np.load('../local_data/inputs/SAGA_Mr_gr_to_AV.npy')
+        n = len(saga_coeffs)
+        deg = int((-3 + np.sqrt ( 9 - 4*(2-2*n) )) // 2 )
+        
+        av = 10.**fit.poly2d(mertab['Mr'], gr, saga_coeffs, deg )
         av[av>4] = np.NaN
     mertab['AV'] = av
     
