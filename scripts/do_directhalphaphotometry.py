@@ -146,9 +146,9 @@ def singleton (
         hdulist = fits.HDUList([imghdu, mask])
         hdulist.writeto(f'{dirname}/halpha/{objname}.fits', overwrite=True)
     
-    return ihalum, u_ihalum, (imag, n708mag)
+    return haflux, u_haflux, ihalum, u_ihalum, (imag, n708mag)
     
-def main (savefile, overwrite=False):
+def main (savefile, overwrite=True):
     merian_sources = read_catalogs ()
     emission_correction, ge_correction, extinction_correction = observational_corrections ( merian_sources )
     if os.path.exists('/tigress/kadofong'):
@@ -167,7 +167,7 @@ def main (savefile, overwrite=False):
     nprocessed = 0
     for name in merian_sources.index:
         try:    
-            ihalum, u_ihalum, (imag, n708mag) = singleton (
+            haflux, u_haflux, ihalum, u_ihalum, (imag, n708mag) = singleton (
                 merian_sources,
                 name, 
                 dirname,
@@ -177,6 +177,8 @@ def main (savefile, overwrite=False):
                 save_cutout=True,  
             )
         
+            lha_df.loc[name, 'FHa'] = haflux.value / 1e-15 # 10^-15 erg / s / cm^2 
+            lha_df.loc[name, 'u_FHa'] = u_haflux.value / 1e-15 # 10^-15 erg / s / cm^2 
             lha_df.loc[name, 'LHa'] = ihalum.value / 1e40 # save in units of 10^40 erg / s
             lha_df.loc[name, 'u_LHa'] = u_ihalum.value / 1e40 # save in units of 10^40 erg/s
             lha_df.loc[name, 'imag'] = imag
