@@ -131,8 +131,14 @@ def singleton (
         ns_correction=emission_correction[isrow],
     )
     emask, catparams = bbmb.define_autoaper('i')
+    
+    # \\ get integrated quantities
     ihalum = halum[emask].sum()    
     u_ihalum = np.sqrt((u_halum[emask]**2).sum())
+    # \\ same for flux
+    ihaflux = haflux[emask].sum()
+    u_ihaflux = np.sqrt((u_haflux[emask]**2).sum())
+    
     imag = -2.5*np.log10( matched_image['i'][emask].sum()) + 27. # \\ convert to AB mag for flux in HSC units
     n708mag = -2.5*np.log10( matched_image['N708'][emask].sum()) + 27.
     
@@ -146,7 +152,7 @@ def singleton (
         hdulist = fits.HDUList([imghdu, mask])
         hdulist.writeto(f'{dirname}/halpha/{objname}.fits', overwrite=True)
     
-    return haflux, u_haflux, ihalum, u_ihalum, haew, u_haew, (imag, n708mag)
+    return ihaflux, u_ihaflux, ihalum, u_ihalum, haew, u_haew, (imag, n708mag)
     
 def main (savefile, overwrite=True):
     merian_sources = read_catalogs ()
