@@ -162,3 +162,11 @@ cython_debug/
 #.idea/
 .vscode/settings.json
 notebooks/*.pkl
+notebooks/*/
+.DS_Store
+.DS_Store
+notebooks/.DS_Store
+notebooks/palomar_targets_2024-09-05.csv
+notebooks/hmsdms
+.gitignore
+notebooks/MassComplete.tar.gz

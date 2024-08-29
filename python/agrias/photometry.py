@@ -69,7 +69,7 @@ def mbestimate_halpha (
     haflux = (bandspecflux_line * tc_integrated / ( trans_atline / haenergy )).to(u.erg/u.s/u.cm**2)
     u_haflux = (u_bandspecflux_line * tc_integrated / ( trans_atline / haenergy )).to(u.erg/u.s/u.cm**2)
     
-    haflux_forew = haflux.copy ()
+    haflux_forew = haflux.copy ()    
     u_haflux_forew = u_haflux.copy()
     
     # \\ 1'' aperture -> total flux correction,

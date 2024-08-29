@@ -18,23 +18,28 @@ from agrias import photometry
 
 cosmo = cosmology.FlatLambdaCDM(70.,0.3)
 
-def merianselect ( merian=None, zmin=0.07, zmax=0.09, maglim=22., only_use=True, verbose=1, av=None, zp=31.4 ):
+def merianselect ( merian=None, zmin=0.06, zmax=0.1, maglim=22., only_use=True, verbose=1, av=None, zp=31.4, pmin=0.244 ):
     if merian is None:
         merian = table.Table(fits.getdata('../local_data/inputs/Merian_DR1_photoz_EAZY_v1.2.fits',1))
     mertab = merian.copy()#[[bu.merian_id, bu.merian_ra, bu.merian_dec, 'z_phot', 'i_cModelmag_Merian']]
     mertab.rename_column(bu.merian_ra,'RA')
     mertab.rename_column(bu.merian_dec,'DEC')
-    inband = mertab['z_phot']>zmin
-    inband &= mertab['z_phot']<zmax
+    inband_probability = merian['pz1']+merian['pz2']+merian['pz3']+merian['pz4']
+    inband = inband_probability > pmin
+    #inband = z_phot>zmin
+    #inband &= z_phot<zmax
     n708mag = -2.5*np.log10(mertab[bu.photcols['N708']]) + zp
-    inband &= n708mag<maglim
+    mi = -2.5*np.log10(mertab['i_cModelFlux_Merian']) + zp
+    #inband &= n708mag<maglim
+    inband &= mi < maglim
     if verbose > 0:
         print(f'[merianselect] Only choosing sources at {zmin:.3f}<z_phot<{zmax:.3f}')
-        print(f'[merianselect] Only choosing sources with i_cModelmag_Merian < {maglim:.1f}')
+        print(f'[merianselect] Only choosing sources with m_i < {maglim:.1f}')
     
     mertab = mertab[inband].to_pandas ()
     mertab = mertab.set_index(bu.merian_id)
     mertab.index = [ 'M%i' % idx for idx in mertab.index ] 
+    z_phot = mertab['z500'].values
     
     for band in 'grizy':
         mertab[f'{band}_gaap1p0FluxErr_aperCorr_Merian'] = mertab[f'{band}_gaap1p0FluxErr_Merian'] * mertab[f'{band}_gaap1p0Flux_aperCorr_Merian']/mertab[f'{band}_gaap1p0Flux_Merian']
@@ -42,23 +47,24 @@ def merianselect ( merian=None, zmin=0.07, zmax=0.09, maglim=22., only_use=True,
     # \\ apply internal extinction corrections
     kcorr_g = observer.calc_kcor(
         'g',
-        mertab['z_phot'],
+        z_phot,
         'g - r',
         -2.5*np.log10(mertab[bu.photcols['g']]/mertab[bu.photcols['r']])        
     )     
     kcorr_r = observer.calc_kcor(
         'r',
-        mertab['z_phot'],
+        z_phot,
         'g - r',
         -2.5*np.log10(mertab[bu.photcols['g']]/mertab[bu.photcols['r']])        
     )    
     kcorr_i = observer.calc_kcor(
         'i',
-        mertab['z_phot'],
+        z_phot,
         'g - i',
         -2.5*np.log10(mertab[bu.photcols['g']]/mertab[bu.photcols['i']])        
     )
-    mertab['Mi'] = mertab['i_cModelmag_Merian'] - cosmo.distmod(mertab['z_phot'].values).value - kcorr_i
+    mi = -2.5*np.log10(mertab['i_cModelFlux_Merian']) + zp
+    mertab['Mi'] = mi - cosmo.distmod(z_phot).value - kcorr_i
     ri = -2.5*np.log10(mertab['r_gaap1p0Flux_aperCorr_Merian']/mertab['i_gaap1p0Flux_aperCorr_Merian'])
     gi = -2.5*np.log10(mertab['g_gaap1p0Flux_aperCorr_Merian']/mertab['i_gaap1p0Flux_aperCorr_Merian'])
     mertab['Mr'] = mertab['Mi'] + (ri - kcorr_r + kcorr_i)
@@ -75,12 +81,16 @@ def merianselect ( merian=None, zmin=0.07, zmax=0.09, maglim=22., only_use=True,
         #av = 10.**np.poly1d(saga_logmstar_coeffs)(logmstar)
         
         saga_coeffs = np.load('../local_data/inputs/SAGA_Mr_gr_to_AV.npy')
+        saga_u_coeffs = np.load('../local_data/inputs/SAGA_Mr_gr_to_u_AV.npy')
         n = len(saga_coeffs)
         deg = int((-3 + np.sqrt ( 9 - 4*(2-2*n) )) // 2 )
         
         av = 10.**fit.poly2d(mertab['Mr'], gr, saga_coeffs, deg )
+        u_av = fit.poly2d(mertab['Mr'], gr, saga_u_coeffs, deg)
+        u_av[av>4] = np.inf
         av[av>4] = np.NaN
     mertab['AV'] = av
+    mertab['u_AV'] = u_av
     
     if only_use:
         if verbose > 0:
