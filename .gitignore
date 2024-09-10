@@ -170,3 +170,4 @@ notebooks/palomar_targets_2024-09-05.csv
 notebooks/hmsdms
 .gitignore
 notebooks/MassComplete.tar.gz
+notebooks/.DS_Store
