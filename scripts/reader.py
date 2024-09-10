@@ -18,12 +18,24 @@ from agrias import photometry
 
 cosmo = cosmology.FlatLambdaCDM(70.,0.3)
 
-def merianselect ( merian=None, zmin=0.06, zmax=0.1, maglim=22., only_use=True, verbose=1, av=None, zp=31.4, pmin=0.244 ):
+def merianselect (
+        merian=None, 
+        #zmin=0.06, 
+        #zmax=0.1, 
+        maglim=22., 
+        only_use=True, 
+        verbose=1, 
+        av=None, 
+        zp=31.4, 
+        pmin=0.244
+    ):
     if merian is None:
-        merian = table.Table(fits.getdata('../local_data/inputs/Merian_DR1_photoz_EAZY_v1.2.fits',1))
-    mertab = merian.copy()#[[bu.merian_id, bu.merian_ra, bu.merian_dec, 'z_phot', 'i_cModelmag_Merian']]
-    mertab.rename_column(bu.merian_ra,'RA')
-    mertab.rename_column(bu.merian_dec,'DEC')
+        #merian = table.Table(fits.getdata('../local_data/inputs/Merian_DR1_photoz_EAZY_v1.2.fits',1))
+        merian = pd.read_csv('../../local_data/scratch_catalogs/Merian_DR1_photoz_EAZY_v2.0_pbandgt0.1.csv')
+    #mertab = merian.copy()#[[bu.merian_id, bu.merian_ra, bu.merian_dec, 'z_phot', 'i_cModelmag_Merian']]
+    #mertab.rename_column(bu.merian_ra,'RA')
+    #mertab.rename_column(bu.merian_dec,'DEC')
+    mertab = merian.rename({bu.merian_ra:'RA', bu.merian_dec:'DEC'}, axis=1)
     inband_probability = merian['pz1']+merian['pz2']+merian['pz3']+merian['pz4']
     inband = inband_probability > pmin
     #inband = z_phot>zmin
@@ -33,10 +45,10 @@ def merianselect ( merian=None, zmin=0.06, zmax=0.1, maglim=22., only_use=True, 
     #inband &= n708mag<maglim
     inband &= mi < maglim
     if verbose > 0:
-        print(f'[merianselect] Only choosing sources at {zmin:.3f}<z_phot<{zmax:.3f}')
+        #print(f'[merianselect] Only choosing sources at {zmin:.3f}<z_phot<{zmax:.3f}')
         print(f'[merianselect] Only choosing sources with m_i < {maglim:.1f}')
     
-    mertab = mertab[inband].to_pandas ()
+    mertab = mertab.loc[inband]#.to_pandas ()
     mertab = mertab.set_index(bu.merian_id)
     mertab.index = [ 'M%i' % idx for idx in mertab.index ] 
     z_phot = mertab['z500'].values
