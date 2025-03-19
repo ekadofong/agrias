@@ -333,11 +333,20 @@ def mk_gminusrcut (catalog, cutcolumn='gminusr',show_roc = False):
     plt.tight_layout()    
     return fig, axarr
     
-def flux2mag ( flux ):
+def flux2mag ( flux, zp=31.4 ):
     # \\\ Merian catalogs are in nJy, such that
     # \\ mAB = -2.5*np.log10(F_merian) + 31.4
     # \\ since -2.5*np.log10(gAB * 1e9 / Jy) = 31.4
-    return -2.5*np.log10(flux) + 31.4
+    return -2.5*np.log10(flux) + zp
+
+def merian_magnitudes ( df, apercorr=None ):
+    if apercorr is None:
+        apercorr = 1.
+    else:
+        apercorr = apercorr.reshape(-1,1)
+    ndf = flux2mag(apercorr * df[[photcols[x] for x in ['g','N540','r','N708','i','z']]])
+    ndf.columns = [ f'{band}_mag' for band in ['g','N540','r','N708','i','z']]
+    return ndf
 
 def qa_models (ctim, ctmap, haim, hamap, ltab, radii, segmentator, pad, x_0=None, y_0=None, ellip=0., pa=0.):
     colors = ['r','lime','cyan']
