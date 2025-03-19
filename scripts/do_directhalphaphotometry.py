@@ -35,9 +35,9 @@ def read_catalogs():
     
     return ms
 
-def observational_corrections (merian_sources):
+def observational_corrections (merian_sources, zphot='z500'):
     emission_correction   = fitting_utils.correct_N2_S3(
-        merian_sources['z_phot'],
+        merian_sources[zphot],
         merian_sources['logmass_gaap1p0']
     )**-1
 
