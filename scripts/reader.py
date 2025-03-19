@@ -22,17 +22,18 @@ def merianselect (
         merian=None, 
         #zmin=0.06, 
         #zmax=0.1, 
-        maglim=22., 
+        maglim=28., 
         only_use=True, 
         verbose=1, 
         av=None, 
         zp=31.4, 
-        pmin=0.244
+        pmin=0.244,
+        require_griz=True
     ):
     if merian is None:
         #merian = table.Table(fits.getdata('../local_data/inputs/Merian_DR1_photoz_EAZY_v1.2.fits',1))
         merian = pd.read_csv('../../local_data/scratch_catalogs/Merian_DR1_photoz_EAZY_v2.0_pbandgt0.1.csv')
-    #mertab = merian.copy()#[[bu.merian_id, bu.merian_ra, bu.merian_dec, 'z_phot', 'i_cModelmag_Merian']]
+    #mertab = merian.copy()#[[bu.merian_id, bu.merian_ra, bu.merian_dec, zphot, 'i_cModelmag_Merian']]
     #mertab.rename_column(bu.merian_ra,'RA')
     #mertab.rename_column(bu.merian_dec,'DEC')
     mertab = merian.rename({bu.merian_ra:'RA', bu.merian_dec:'DEC'}, axis=1)
@@ -111,6 +112,12 @@ def merianselect (
         #imagcut = mertab['i_cModelmag_Merian'] < 23.
         use = extendedness#&imagcut
         mertab = mertab.loc[use]
+    
+    if require_griz:
+        has_nan = mertab[[bu.photcols[x] for x in 'griz']].isna().any(axis=1)
+        mertab = mertab.loc[~has_nan]
+        if verbose > 0:
+            print("[merianselect] only choosing sources with griz photometry")        
     return mertab
 
 def galexcrossmatch ( filename=None,  ):
@@ -144,7 +151,65 @@ def get_meriancrossgalex (merian=None):
     galex = _galex.loc[~_galex.index.duplicated(keep='first')].reindex(overlap)#.reset_index()
     return merian_sources, galex     
 
-def compute_halphacorrections ( mcat, use_dustengine=True, load_from_pickle=True, verbose=1 ):
+def correct_N2_S3(z, mass):
+    '''
+    From Abby's code fitting_utils.correct_N2_S3
+    '''
+    if hasattr(mass, 'all'):
+        correction = np.zeros_like(mass)
+        
+        lowmass = mass < 9.2
+        midmass = (mass>=9.2)&(mass<9.8)
+        highmass  = (mass>=9.8)
+        
+        lowz = z<0.074
+        midz = (z>=0.074)&(z<0.083)
+        highz = z>0.083
+        
+        correction[lowmass&lowz] = 1.39
+        correction[lowmass&midz] = -18.8*(z[lowmass&midz] - 0.074) +1.39
+        correction[lowmass&highz]= 1.22
+        correction[midmass&lowz] = 1.77
+        correction[midmass&midz] = -41.29*(z[midmass&midz] - 0.074) +1.77
+        correction[midmass&highz]= 1.39
+        correction[highmass&lowz]= 1.85
+        correction[highmass&midz] = -41.97*(z[highmass&midz] - 0.074) +1.85
+        correction[highmass&highz]= 1.48
+        return correction
+        
+    else:
+        if mass < 9.2:
+            if z<0.074:
+                return(1.39)
+            elif z>0.083:
+                return(1.22)
+            else:
+                return(-18.8*(z - 0.074) +1.39) 
+        if mass < 9.8:
+            if z<0.074:
+                return(1.77)
+            elif z>0.083:
+                return(1.39)
+            else:
+                return(-41.29*(z - 0.074) +1.77)
+        else:
+            if z<0.074:
+                return(1.85)
+            elif z>0.083:
+                return(1.48)
+            else:
+                return(-41.97*(z - 0.074) +1.85) 
+
+def compute_halphacorrections(
+        mcat, 
+        use_dustengine=False, 
+        load_from_pickle=True, 
+        verbose=1, 
+        zphot='z500',
+        rakey= 'RA',
+        deckey='DEC', 
+        estimated_av=None
+    ):
     '''
     
     '''
@@ -154,10 +219,16 @@ def compute_halphacorrections ( mcat, use_dustengine=True, load_from_pickle=True
     
     if verbose>0:
         start = time.time ()
+        
+    aperture_correction = mcat['i_cModelFlux_Merian'] / mcat['i_gaap1p0Flux_Merian']
+    if verbose>0:
+        print(f'Computed aperture correction in {time.time() - start:.1f} seconds.')
+        #start = time.time ()    
+            
     # \\ correct for other emission lines via Mintz+24
-    emission_correction = fitting_utils.correct_N2_S3(
-        mcat['z_phot'],
-        mcat['logmass_gaap1p0']
+    emission_correction = correct_N2_S3(
+        mcat[zphot],
+        mcat['logmass_gaap1p0'] + np.log10(aperture_correction)
     )**-1    
     if verbose>0:
         print(f'Computed line contamination in {time.time() - start:.1f} seconds.')
@@ -171,10 +242,25 @@ def compute_halphacorrections ( mcat, use_dustengine=True, load_from_pickle=True
         else:
             dusteng = query.DustEngine()
         direct_geav = mcat.apply(lambda row: dusteng.get_SandFAV(row['RA'], row['DEC']),axis=1) 
+        if not load_from_pickle:
+            with open('../local_data/output/dustengine.pickle', 'wb') as f:
+                dusteng = pickle.dump(dusteng, f)
     else:
-        rv = 3.1
-        direct_geav = mcat['ebv_Merian'] * rv
-       
+        from scipy import interpolate
+        #rv = 3.1
+        #direct_geav = mcat['ebv_Merian'] * rv
+        avmap = np.load('../local_data/inputs/avmap.npz')['arr_0']
+        ragrid = np.load('../local_data/inputs/avmap_ragrid.npz')['arr_0']
+        decgrid = np.load('../local_data/inputs/avmap_decgrid.npz')['arr_0']
+        ra_padded = np.concatenate([ragrid-360,ragrid, ragrid+360])
+        avmap_padded = np.hstack([avmap,avmap,avmap])
+        ifn = interpolate.RegularGridInterpolator([ra_padded, decgrid], avmap_padded.T)
+        
+        mra = mcat[rakey]
+        mdec = mcat[deckey]
+        mcoords = np.stack([mra,mdec]).T
+        direct_geav = ifn(mcoords)
+ 
     ge_correction = photometry.uvopt_gecorrection(mcat, av=direct_geav)
     if verbose>0:
         print(f'Computed Galactic extinction in {time.time() - start:.1f} seconds.')
@@ -182,7 +268,11 @@ def compute_halphacorrections ( mcat, use_dustengine=True, load_from_pickle=True
     
     restwl = np.array([1548.85, 2303.37, 7080.])
     dust_correction = np.zeros((len(emission_correction),3))
-    for idx,av in enumerate(mcat['AV']):
+    if estimated_av is None:
+        avbase = mcat['AV']
+    else:
+        avbase = estimated_av
+    for idx,av in enumerate(avbase):
         if hasattr(av,'mask'):
             dust_correction[idx] = np.NaN
         else:
@@ -191,11 +281,7 @@ def compute_halphacorrections ( mcat, use_dustengine=True, load_from_pickle=True
         print(f'Computed internal extinction in {time.time() - start:.1f} seconds.')
         start = time.time ()            
             
-    aperture_correction = mcat['i_cModelFlux_Merian'] / mcat['i_gaap1p0Flux_Merian']
-    if verbose>0:
-        print(f'Computed aperture correction in {time.time() - start:.1f} seconds.')
-        #start = time.time ()    
-    
+
     return emission_correction, ge_correction, dust_correction, aperture_correction
     
         
@@ -231,7 +317,8 @@ def galex_luminosities ( galex, redshifts, ge_arr=None, dust_corr=None ):
 
 def load_abbyver (
         merian_sources, 
-        galex        
+        galex,
+        zphot='z500'        
     ):
     linetable = pd.read_csv(
         '/Users/kadofong/work/projects/merian/local_data/cutouts/galex/haew.csv', 
@@ -244,10 +331,10 @@ def load_abbyver (
     rv = 4.05
     wv_eff = np.array([1548.85, 2303.37, 7080.])
     ge_arr = np.zeros([len(galex),wv_eff.size])
-    for idx,(z,av) in enumerate(zip(merian_sources['z_phot'].values, merian_sources['ebv_Merian'].values * rv)):
+    for idx,(z,av) in enumerate(zip(merian_sources[zphot].values, merian_sources['ebv_Merian'].values * rv)):
         ge_arr[idx] = observer.gecorrection ( wv_eff*(z+1.), av, rv, return_magcorr=False)
 
-    z_phot = merian_sources['z_phot'].values
+    z_phot = merian_sources[zphot].values
     wl_obs = 6563. * u.AA * ( 1. + z_phot )
     linetable['haflux'] = (linetable['haew'].values * u.AA * linetable['continuum_specflux'].values * u.Jy * co.c / wl_obs**2).to(u.erg/u.s/u.cm**2).value
     linetable['haflux'] = linetable['haflux'] * ge_arr[:,2]
