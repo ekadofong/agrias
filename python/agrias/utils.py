@@ -339,6 +339,16 @@ def flux2mag ( flux, zp=31.4 ):
     # \\ since -2.5*np.log10(gAB * 1e9 / Jy) = 31.4
     return -2.5*np.log10(flux) + zp
 
+def lum2absmag ( Lr, wveff ):
+    Lr_nu = Lr * wveff**2 / co.c
+    Mr = -2.5*np.log10(Lr_nu/(4.*np.pi*(10.*u.pc)**2)/(3631.*u.Jy))
+    return Mr
+
+def absmag2lum ( absmag, wveff ):
+    Lr = 3631.*u.Jy*10.**(absmag/-2.5)*(4.*np.pi*(10.*u.pc).to(u.cm)**2)
+    Lr = (Lr * co.c / wveff**2).to(u.erg/u.s/u.AA)  
+    return Lr  
+
 def merian_magnitudes ( df, apercorr=None ):
     if apercorr is None:
         apercorr = 1.

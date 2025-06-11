@@ -1,6 +1,7 @@
 import time
 import pickle
 import numpy as np
+from scipy import interpolate
 import pandas as pd
 from astropy import table
 from astropy import units as u
@@ -18,6 +19,62 @@ from agrias import photometry
 
 cosmo = cosmology.FlatLambdaCDM(70.,0.3)
 
+def mk_geav ():
+    avmap = np.load('../local_data/inputs/avmap.npz')['arr_0']
+    ragrid = np.load('../local_data/inputs/avmap_ragrid.npz')['arr_0']
+    decgrid = np.load('../local_data/inputs/avmap_decgrid.npz')['arr_0']
+    ra_padded = np.concatenate([ragrid-360,ragrid, ragrid+360])
+    avmap_padded = np.hstack([avmap,avmap,avmap])
+    ifn = interpolate.RegularGridInterpolator([ra_padded, decgrid], avmap_padded.T)
+    return ifn 
+
+def estimate_av (merian):
+    mi = -2.5*np.log10(merian['i_cModelFlux_Merian']*1e-9/3631.)
+    Mi = mi - cosmo.distmod(0.08).value
+    ri = -2.5*np.log10(merian['r_gaap1p0Flux_aperCorr_Merian']/merian['i_gaap1p0Flux_aperCorr_Merian'])
+    gi = -2.5*np.log10(merian['g_gaap1p0Flux_aperCorr_Merian']/merian['i_gaap1p0Flux_aperCorr_Merian'])
+    gr = -2.5*np.log10(merian['g_gaap1p0Flux_aperCorr_Merian']/merian['r_gaap1p0Flux_aperCorr_Merian'])
+    Mr = Mi + ri
+
+    saga_coeffs = np.load('../local_data/inputs/SAGA_Mr_gr_to_AV.npy')
+    saga_u_coeffs = np.load('../local_data/inputs/SAGA_Mr_gr_to_u_AV.npy')
+    n = len(saga_coeffs)
+    deg = int((-3 + np.sqrt ( 9 - 4*(2-2*n) )) // 2 )
+
+    av = 10.**fit.poly2d(Mr, gr, saga_coeffs, deg )
+    u_av = fit.poly2d(Mr, gr, saga_u_coeffs, deg)
+    u_av[av>4] = np.inf
+    av[av>4] = np.NaN
+    return av
+    
+
+def merianbroad (filename=None, zphot=0.08):
+    if filename is None:
+        filename = '../local_data/inputs/Merian_DR1_photoz_EAZY_v2.0.fits'
+    merian = fits.getdata(filename, 1)
+
+    rmag = bu.flux2mag(merian['r_cModelFlux_Merian'])
+
+    mi = -2.5*np.log10(merian['i_cModelFlux_Merian']*1e-9/3631.)
+    Mi = mi - cosmo.distmod(zphot).value
+    ri = -2.5*np.log10(merian['r_gaap1p0Flux_aperCorr_Merian']/merian['i_gaap1p0Flux_aperCorr_Merian'])
+    gi = -2.5*np.log10(merian['g_gaap1p0Flux_aperCorr_Merian']/merian['i_gaap1p0Flux_aperCorr_Merian'])
+    gr = -2.5*np.log10(merian['g_gaap1p0Flux_aperCorr_Merian']/merian['r_gaap1p0Flux_aperCorr_Merian'])
+    Mr = Mi + ri
+
+    saga_coeffs = np.load('../local_data/inputs/SAGA_Mr_gr_to_AV.npy')
+    saga_u_coeffs = np.load('../local_data/inputs/SAGA_Mr_gr_to_u_AV.npy')
+    n = len(saga_coeffs)
+    deg = int((-3 + np.sqrt ( 9 - 4*(2-2*n) )) // 2 )
+
+    av = 10.**fit.poly2d(Mr, gr, saga_coeffs, deg )
+    u_av = fit.poly2d(Mr, gr, saga_u_coeffs, deg)
+    u_av[av>4] = np.inf
+    av[av>4] = np.NaN
+    
+    return merian, rmag, Mr, av
+    
+
 def merianselect (
         merian=None, 
         #zmin=0.06, 
@@ -27,18 +84,29 @@ def merianselect (
         verbose=1, 
         av=None, 
         zp=31.4, 
-        pmin=0.244,
-        require_griz=True
+        pmin=0.3,
+        z_phot=0.08,
+        require_griz=True,
+        version=2
     ):
     if merian is None:
         #merian = table.Table(fits.getdata('../local_data/inputs/Merian_DR1_photoz_EAZY_v1.2.fits',1))
-        merian = pd.read_csv('../../local_data/scratch_catalogs/Merian_DR1_photoz_EAZY_v2.0_pbandgt0.1.csv')
+        if version == 2:
+            merian = pd.read_csv('../../local_data/scratch_catalogs/Merian_DR1_photoz_EAZY_v2.0_pbandgt0.1.csv')
+            merian['logmass_gaap'] = merian['logmass_gaap1p0']
+        elif version == 3:
+            merian =  table.Table(fits.getdata('../local_data/inputs/Merian_DR1_photoz_EAZY_v3.0_inbandspecz.fits',1)).to_pandas()
+        
     #mertab = merian.copy()#[[bu.merian_id, bu.merian_ra, bu.merian_dec, zphot, 'i_cModelmag_Merian']]
     #mertab.rename_column(bu.merian_ra,'RA')
     #mertab.rename_column(bu.merian_dec,'DEC')
     mertab = merian.rename({bu.merian_ra:'RA', bu.merian_dec:'DEC'}, axis=1)
-    inband_probability = merian['pz1']+merian['pz2']+merian['pz3']+merian['pz4']
-    inband = inband_probability > pmin
+    if pmin > 0.:
+        inband_probability = merian['pz1']+merian['pz2']+merian['pz3']+merian['pz4']
+        mertab['pz'] = inband_probability
+        inband = inband_probability > pmin
+    else:
+        inband = np.ones(len(merian), dtype=bool)
     #inband = z_phot>zmin
     #inband &= z_phot<zmax
     n708mag = -2.5*np.log10(mertab[bu.photcols['N708']]) + zp
@@ -52,7 +120,8 @@ def merianselect (
     mertab = mertab.loc[inband]#.to_pandas ()
     mertab = mertab.set_index(bu.merian_id)
     mertab.index = [ 'M%i' % idx for idx in mertab.index ] 
-    z_phot = mertab['z500'].values
+    if isinstance(z_phot,str):
+        z_phot = mertab[z_phot].values
     
     for band in 'grizy':
         mertab[f'{band}_gaap1p0FluxErr_aperCorr_Merian'] = mertab[f'{band}_gaap1p0FluxErr_Merian'] * mertab[f'{band}_gaap1p0Flux_aperCorr_Merian']/mertab[f'{band}_gaap1p0Flux_Merian']
@@ -82,6 +151,7 @@ def merianselect (
     gi = -2.5*np.log10(mertab['g_gaap1p0Flux_aperCorr_Merian']/mertab['i_gaap1p0Flux_aperCorr_Merian'])
     mertab['Mr'] = mertab['Mi'] + (ri - kcorr_r + kcorr_i)
     mertab['Mg'] = mertab['Mi'] + (gi - kcorr_g + kcorr_i)
+    mertab['MB'] = mertab['Mg'] + 0.33*(mertab['Mg']-mertab['Mr']) + 0.20 # https://www.sdss3.org/dr8/algorithms/sdssUBVRITransform.php
     
     gr = -2.5*np.log10(mertab[bu.photcols['g']]/mertab[bu.photcols['r']])
     if av is None:
@@ -203,12 +273,13 @@ def correct_N2_S3(z, mass):
 def compute_halphacorrections(
         mcat, 
         use_dustengine=False, 
-        load_from_pickle=True, 
+        load_from_pickle=False, 
         verbose=1, 
         zphot='z500',
         rakey= 'RA',
         deckey='DEC', 
-        estimated_av=None
+        estimated_av=None,
+        logmstar_key='logmass_gaap'
     ):
     '''
     
@@ -226,9 +297,15 @@ def compute_halphacorrections(
         #start = time.time ()    
             
     # \\ correct for other emission lines via Mintz+24
+    if isinstance(zphot,float):
+        zphot = zphot
+    else:
+        zphot = mcat[zphot]
+        
+    
     emission_correction = correct_N2_S3(
-        mcat[zphot],
-        mcat['logmass_gaap1p0'] + np.log10(aperture_correction)
+        zphot,
+        mcat[logmstar_key] + np.log10(aperture_correction)
     )**-1    
     if verbose>0:
         print(f'Computed line contamination in {time.time() - start:.1f} seconds.')
@@ -245,8 +322,7 @@ def compute_halphacorrections(
         if not load_from_pickle:
             with open('../local_data/output/dustengine.pickle', 'wb') as f:
                 dusteng = pickle.dump(dusteng, f)
-    else:
-        from scipy import interpolate
+    else:        
         #rv = 3.1
         #direct_geav = mcat['ebv_Merian'] * rv
         avmap = np.load('../local_data/inputs/avmap.npz')['arr_0']
@@ -332,7 +408,7 @@ def load_abbyver (
     wv_eff = np.array([1548.85, 2303.37, 7080.])
     ge_arr = np.zeros([len(galex),wv_eff.size])
     for idx,(z,av) in enumerate(zip(merian_sources[zphot].values, merian_sources['ebv_Merian'].values * rv)):
-        ge_arr[idx] = observer.gecorrection ( wv_eff*(z+1.), av, rv, return_magcorr=False)
+        ge_arr[idx] = observer.gecorrection ( wv_eff*(1.+z), av, rv, return_magcorr=False)
 
     z_phot = merian_sources[zphot].values
     wl_obs = 6563. * u.AA * ( 1. + z_phot )

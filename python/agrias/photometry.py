@@ -130,6 +130,7 @@ def mbestimate_halpha (
         #
         #bandspecflux_continuum = 10.**(b_mer+c).flatten() * specflux_unit
     
+
     bandspecflux_line = n708data*specflux_unit - bandspecflux_continuum
     u_bandspecflux_line = np.sqrt((u_n708data*specflux_unit)**2 + 0.25 * (u_rdata*specflux_unit)**2 + 0.25 * (u_idata*specflux_unit)**2)
     
@@ -141,6 +142,7 @@ def mbestimate_halpha (
     trans_atline = np.interp(harestwl*(1.+redshift), transmission['wv'], transmission['transmission_lambda'])
 
     haenergy = (co.h*co.c/(harestwl*(1.+redshift))).to(u.erg)
+    
     haflux = (bsf_lambda * tc_integrated / trans_atline ).to(u.erg/u.s/u.cm**2)
     u_haflux = (u_bsf_lambda * tc_integrated / trans_atline).to(u.erg/u.s/u.cm**2)
     #haflux = (bandspecflux_line * tc_integrated / ( trans_atline / haenergy )).to(u.erg/u.s/u.cm**2)
