@@ -1,4 +1,5 @@
 import os
+import importlib.resources
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy import interpolate
@@ -17,11 +18,13 @@ from ekfstats import math, fit
 from . import utils
 
 cosmo = cosmology.FlatLambdaCDM(70.,0.3)
-harestwl = 6563. * u.AA
+#band_restwl = 6563. * u.AA
 
-def load_transmission (fname=None):
+def load_transmission (fname=None, band=None):
     if fname is None:
-        fname = f"../local_data/filters/mer_n708.txt"    
+        if band is None:
+            band = 'n708'
+        fname = importlib.resources.files("agrias").joinpath(f"data/mer_{band}.txt")
     transmission = table.Table.read(
         fname,
         comment='#',
@@ -50,14 +53,18 @@ def mbestimate_halpha (
         do_linecorrection=True,
         apercorr=1.,
         ex_correction=1.,
+        u_ex_correction=0.,
         ge_correction=1.,
         ns_correction=1.,
         specflux_unit = None,
         filter_curve_file = None,
         zp = 31.4,
-        wv_eff_mb = 7080.,
+        band='n708',
+        #wv_eff_mb = 7080.,
+        #wv_rest_mb = 6563., 
         ctype='powerlaw',
-        plawbands='griz'
+        plawbands='griz',
+        continuum_adjust=None
     ):
     if specflux_unit is None:
         # -2.5 log10(X/3631 Jy) = 27
@@ -66,8 +73,11 @@ def mbestimate_halpha (
         # X = 10^(27./-2.5) * 3631 Jy
         
         specflux_unit = 10.**(zp/-2.5) * 3631. * u.Jy
-        
-    transmission = load_transmission (filter_curve_file)
+    
+    transmission = load_transmission (filter_curve_file, band=band)
+    wv_eff_mb = {'n708':7080., 'n540':5400.}[band]
+    wv_rest_mb = {'n708':6563., 'n540':5007.}[band]
+    line_restwl = wv_rest_mb * u.AA   
     
     if ctype == 'ri_avg':
         bandspecflux_continuum = (rdata + idata )/2. * specflux_unit
@@ -105,6 +115,7 @@ def mbestimate_halpha (
         lsq_y = np.log10(np.array([ fdict[band] for band in plawbands ]))
         lsq_coeffs = fit.closedform_leastsq(lsq_x, lsq_y)
         bandspecflux_continuum = 10.**(lsq_coeffs[0]+lsq_coeffs[1]*np.log10(wv_eff_mb)).flatten() * specflux_unit
+        
         #bandspecflux_continuum = (lsq_coeffs[0]+lsq_coeffs[1]*7080.).flatten() * specflux_unit
         #w = np.log10(wv_eff)   
         ##w_zp = w[0]     
@@ -130,6 +141,12 @@ def mbestimate_halpha (
         #
         #bandspecflux_continuum = 10.**(b_mer+c).flatten() * specflux_unit
     
+    if continuum_adjust is not None:
+        print(f'[photometry.mbestimate_halpha] Ad-hoc adjustment to continuum fluxes of {continuum_adjust} mag!')
+        adjust = 10.**(-0.4*continuum_adjust)
+        bandspecflux_continuum *= adjust
+        
+    
 
     bandspecflux_line = n708data*specflux_unit - bandspecflux_continuum
     u_bandspecflux_line = np.sqrt((u_n708data*specflux_unit)**2 + 0.25 * (u_rdata*specflux_unit)**2 + 0.25 * (u_idata*specflux_unit)**2)
@@ -139,9 +156,9 @@ def mbestimate_halpha (
     #tc_integrated = math.trapz(transmission['transmission_nu']/(co.h*transmission['freq']), transmission['freq'])
     # = \int Tr(v)/(hv) dv
     tc_integrated = math.trapz(transmission['transmission_lambda'], transmission['wv'].value ) * transmission['wv'].unit
-    trans_atline = np.interp(harestwl*(1.+redshift), transmission['wv'], transmission['transmission_lambda'])
+    trans_atline = np.interp(line_restwl*(1.+redshift), transmission['wv'], transmission['transmission_lambda'])
 
-    haenergy = (co.h*co.c/(harestwl*(1.+redshift))).to(u.erg)
+    haenergy = (co.h*co.c/(line_restwl*(1.+redshift))).to(u.erg)
     
     haflux = (bsf_lambda * tc_integrated / trans_atline ).to(u.erg/u.s/u.cm**2)
     u_haflux = (u_bsf_lambda * tc_integrated / trans_atline).to(u.erg/u.s/u.cm**2)
@@ -163,8 +180,10 @@ def mbestimate_halpha (
         
     # \\ rough internal extinction correction assuming AV=0.5
     if do_extinctioncorrection:        
+        # Fintr = c*Fobs
+        # sigma^2(Fintr) = c**2 * sigma(Fobs)**2 + sigma(c)**2 * Fobs**2        
+        u_haflux = np.sqrt((ex_correction*u_haflux)**2 + (u_ex_correction * haflux)**2)
         haflux *= ex_correction
-        u_haflux *= ex_correction
         fcontinuum_ac *= ex_correction
         
     
@@ -182,7 +201,7 @@ def mbestimate_halpha (
         haflux_forew *= ns_correction
         u_haflux_forew *= ns_correction
     
-    wv_eff = 7080*u.AA
+    wv_eff = wv_eff_mb*u.AA
     bandspecflux_continuum_wl = co.c * bandspecflux_continuum / wv_eff**2
     haew = (haflux_forew / bandspecflux_continuum_wl).to(u.AA)
     u_haew = (u_haflux_forew / bandspecflux_continuum_wl).to(u.AA)
@@ -199,15 +218,15 @@ def mbestimate_halpha (
 def uvopt_gecorrection (merian_sources, av=None, rv=3.1, zphot='z500'):
     if av is None:
         av = merian_sources['ebv_Merian'] * rv
-    wv_eff = np.array([1548.85, 2303.37, 0.])
+    wv_eff = np.array([1548.85, 2303.37, 7080., 5400.])
     ge_arr = np.zeros([len(merian_sources),wv_eff.size])
     for idx,(z,c_av) in enumerate(zip(merian_sources[zphot], av)):
-        wv_eff[2] = harestwl.value * (1. + z)
-        ge_arr[idx] = observer.gecorrection ( wv_eff/(1. + z), c_av, rv, return_magcorr=False)
+        #wv_eff[2] = wv_eff.value * (1. + z)
+        ge_arr[idx] = observer.gecorrection ( wv_eff, c_av, rv, return_magcorr=False)
     return ge_arr
 
 def uvopt_internalextcorrection (merian_sources):
-    restwl = np.array([1548.85, 2303.37, 7080.])
+    restwl = np.array([1548.85, 2303.37, 7080., 5400.])
 
     dust_corr = np.zeros((len(merian_sources),3))
     for idx,av in enumerate(merian_sources['AV']):
@@ -225,7 +244,7 @@ def naive_halpha_fromcatalog ( merian, galex, z_col='z500' ):
     #bandspecflux_line = merian_sources[utils.photcols['N708']]*specflux_unit - bandspecflux_continuum
 
     #tc_integrated = np.trapz(transmission['transmission'][::-1]/(co.h*transmission['freq'][::-1]), transmission['freq'][::-1])
-    #trans_atline = np.interp(harestwl*(1.+merian_sources[z_col]), transmission['wv'], transmission['transmission'])
+    #trans_atline = np.interp(line_restwl*(1.+merian_sources[z_col]), transmission['wv'], transmission['transmission'])
 
     # \\ estimate observed Halpha flux (i.e. no extinction correction, redshifting, etc. etc.)
     haflux = mbestimate_halpha(
